@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "sourcerer": {
+      "type": "stdio",
+      "command": "/home/stephen/Projects/sourcerer-mcp/sourcerer",
+      "args": [
+        "--workspace", "/home/stephen/Projects/sourcerer-mcp"
+      ],
+      "env": {}
+    }
+  }
+}
