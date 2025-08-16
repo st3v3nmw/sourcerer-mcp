@@ -175,7 +175,6 @@ func (e *Editor) GetChunkSources(ctx context.Context, ids []string) string {
 	chunks := ""
 	for _, id := range ids {
 		chunks += e.getChunkSource(ctx, id)
-		chunks += "\n"
 	}
 
 	return chunks

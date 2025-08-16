@@ -16,7 +16,7 @@ import (
 
 const (
 	minSimilarity = 0.3
-	maxResults    = 15
+	maxResults    = 30
 )
 
 type Index struct {
@@ -133,9 +133,15 @@ func (idx *Index) GetAllChunkIDs(ctx context.Context) map[string][]string {
 		startByte int
 	})
 
+	staleChunkIDs := []string{}
 	for _, id := range ids {
 		doc, err := idx.collection.GetByID(ctx, id)
 		if err != nil {
+			continue
+		}
+
+		if idx.isDocumentStale(&doc) {
+			staleChunkIDs = append(staleChunkIDs, doc.ID)
 			continue
 		}
 
@@ -164,6 +170,10 @@ func (idx *Index) GetAllChunkIDs(ctx context.Context) map[string][]string {
 		result[filePath] = chunkIDs
 	}
 
+	if len(staleChunkIDs) > 0 {
+		go idx.collection.Delete(ctx, nil, nil, staleChunkIDs...)
+	}
+
 	return result
 }
 
@@ -186,7 +196,6 @@ func (idx *Index) Search(ctx context.Context, query string) ([]string, error) {
 
 		doc, err := idx.collection.GetByID(ctx, result.ID)
 		if err != nil {
-			staleChunkIDs = append(staleChunkIDs, result.ID)
 			continue
 		}
 

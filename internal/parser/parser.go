@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	summaryMaxChars = 60
+	summaryMaxChars = 80
 )
 
 type Parser interface {
@@ -109,7 +109,7 @@ func (f *File) Copy() File {
 		}
 	}
 
-	source := []byte{}
+	source := make([]byte, len(f.Source))
 	copy(f.Source, source)
 
 	return File{
