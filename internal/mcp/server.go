@@ -67,7 +67,7 @@ This addressing is persistent and won't break with minor code changes.
 Use get_source_code with these precise ids to get exactly the code you need.
 
 BATCHING:
-Prefer batched operations - get_file_overviews for multiple files, get_source_code for multiple chunks.
+Prefer batched operations - get_table_of_contents for multiple files, get_source_code for multiple chunks.
 When you need multiple related chunks, collect the chunk ids first then batch them in
 a single get_source_code call.
 This is better than making separate requests which waste tokens and time (round-trips).
@@ -99,8 +99,8 @@ This is better than making separate requests which waste tokens and time (round-
 	)
 
 	s.mcp.AddTool(
-		mcp.NewTool("get_file_overviews",
-			mcp.WithDescription("Preview what's in files before diving deep"),
+		mcp.NewTool("get_table_of_contents",
+			mcp.WithDescription("Get table of contents showing file structure and chunk IDs"),
 			mcp.WithArray("files",
 				mcp.WithStringItems(),
 				mcp.MinItems(1),
@@ -108,7 +108,7 @@ This is better than making separate requests which waste tokens and time (round-
 				mcp.Description("File paths to analyze"),
 			),
 		),
-		s.getFileOverviews,
+		s.getTableOfContents,
 	)
 
 	s.mcp.AddTool(
@@ -172,10 +172,10 @@ func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest
 	return mcp.NewToolResultText(content), nil
 }
 
-func (s *Server) getFileOverviews(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (s *Server) getTableOfContents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	filePaths := request.GetStringSlice("files", []string{})
-	overviews := s.editor.GetOverviews(ctx, filePaths)
-	return mcp.NewToolResultText(overviews), nil
+	tocs := s.editor.GetTOCs(ctx, filePaths)
+	return mcp.NewToolResultText(tocs), nil
 }
 
 func (s *Server) getSourceCode(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

@@ -12,10 +12,11 @@ import (
 )
 
 type Editor struct {
-	workspaceRoot string
-	parsers       map[Language]parser.Parser
-	files         map[string][]string // file path -> chunk paths
-	index         *index.Index
+	workspaceRoot       string
+	parsers             map[Language]parser.Parser
+	files               map[string][]string // file path -> chunk paths
+	index               *index.Index
+	initialIndexingDone chan struct{}
 }
 
 func New(ctx context.Context, workspaceRoot string) (*Editor, error) {
@@ -25,10 +26,11 @@ func New(ctx context.Context, workspaceRoot string) (*Editor, error) {
 	}
 
 	editor := &Editor{
-		workspaceRoot: workspaceRoot,
-		parsers:       map[Language]parser.Parser{},
-		files:         map[string][]string{},
-		index:         index,
+		workspaceRoot:       workspaceRoot,
+		parsers:             map[Language]parser.Parser{},
+		files:               map[string][]string{},
+		index:               index,
+		initialIndexingDone: make(chan struct{}),
 	}
 
 	fileChunks := index.GetAllChunkIDs(ctx)
@@ -53,6 +55,8 @@ func (e *Editor) indexWorkspace(ctx context.Context) {
 		e.chunk(ctx, filePath)
 		return nil
 	})
+
+	close(e.initialIndexingDone)
 }
 
 func (e *Editor) getParser(filePath string) (parser.Parser, error) {
@@ -118,14 +122,14 @@ func (e *Editor) chunk(ctx context.Context, filePath string) {
 	e.files[filePath] = paths
 }
 
-func (e *Editor) getOverview(ctx context.Context, filePath string) string {
+func (e *Editor) getTOC(ctx context.Context, filePath string) string {
 	e.chunk(ctx, filePath)
 
-	overview := fmt.Sprintf("== %s ==\n\n", filePath)
+	toc := fmt.Sprintf("== %s ==\n\n", filePath)
 
 	paths, exists := e.files[filePath]
 	if !exists {
-		return overview + "<file not found or could not be processed>\n\n"
+		return toc + "<file not found or could not be processed>\n\n"
 	}
 
 	for _, chunkPath := range paths {
@@ -136,23 +140,23 @@ func (e *Editor) getOverview(ctx context.Context, filePath string) string {
 		}
 
 		if chunk.Path != "" {
-			overview += "::" + chunk.Path + "\n"
+			toc += "::" + chunk.Path + "\n"
 		}
 
-		overview += chunk.Summary + "\n\n"
+		toc += chunk.Summary + "\n\n"
 	}
 
-	return overview
+	return toc
 }
 
-func (e *Editor) GetOverviews(ctx context.Context, filePaths []string) string {
-	overviews := ""
+func (e *Editor) GetTOCs(ctx context.Context, filePaths []string) string {
+	tocs := ""
 	for _, filePath := range filePaths {
-		overviews += e.getOverview(ctx, filePath)
-		overviews += "\n"
+		tocs += e.getTOC(ctx, filePath)
+		tocs += "\n"
 	}
 
-	return overviews
+	return tocs
 }
 
 func (e *Editor) getChunkSource(ctx context.Context, id string) string {
@@ -181,6 +185,7 @@ func (e *Editor) GetChunkSources(ctx context.Context, ids []string) string {
 }
 
 func (e *Editor) SemanticSearch(ctx context.Context, query string) ([]string, error) {
+	<-e.initialIndexingDone
 	return e.index.Search(ctx, query)
 }
 
