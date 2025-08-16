@@ -45,7 +45,7 @@ Describe what you're looking for conceptually and functionally:
 Good queries:
 - "user authentication and session management logic"
 - "error handling and exception processing code"
-- "file parsing and syntax analysis functionality"
+- "file parsing and syntax analysis"
 - "database operations and data persistence"
 - "HTTP request routing and API endpoints"
 - "configuration loading and environment setup"
@@ -119,7 +119,7 @@ This is better than making separate requests which waste tokens and time (round-
 				mcp.MinItems(1),
 				mcp.Required(),
 				mcp.Description(`
-					IDs to chunks to get source code for e.g.
+					FULL chunk IDs to get source code for e.g.
 					['pkg/fs/files.go::File::IsDir', 'src/auth/login.js::generateJWT', 'src/utils.js::af81a7ff']
 				`),
 			),
