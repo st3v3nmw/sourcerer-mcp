@@ -1,16 +1,17 @@
 package main
 
 import (
-	"flag"
 	"log"
+	"os"
 
 	"github.com/st3v3nmw/sourcerer-mcp/internal/mcp"
 )
 
 func main() {
-	var workspaceRoot string
-	flag.StringVar(&workspaceRoot, "workspace", ".", "Project workspace directory")
-	flag.Parse()
+	workspaceRoot := os.Getenv("SOURCERER_WORKSPACE_ROOT")
+	if workspaceRoot == "" {
+		workspaceRoot = "."
+	}
 
 	server, err := mcp.NewServer(workspaceRoot)
 	if err != nil {

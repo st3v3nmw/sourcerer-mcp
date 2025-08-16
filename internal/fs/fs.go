@@ -1,4 +1,4 @@
-package mcp
+package fs
 
 import (
 	"os"
@@ -7,7 +7,8 @@ import (
 	"strings"
 )
 
-func shouldIgnore(name string, isDir bool) bool {
+// ShouldIgnore determines if a file or directory should be ignored
+func ShouldIgnore(name string, isDir bool) bool {
 	ignoredDirs := []string{
 		".git", ".hg", ".svn", ".bzr", // Version control
 		"node_modules", "vendor", "Godeps", // Dependencies
@@ -25,7 +26,7 @@ func shouldIgnore(name string, isDir bool) bool {
 				return true
 			}
 		}
-		// Ignore hidden directories (except .github, .vscode for some projects)
+		// Ignore hidden directories (except .github, .claude for some projects)
 		if strings.HasPrefix(name, ".") && name != ".github" && name != ".claude" {
 			return true
 		}
@@ -37,6 +38,56 @@ func shouldIgnore(name string, isDir bool) bool {
 	}
 
 	return false
+}
+
+// IsSourceFile determines if a file is a source code file that should be indexed
+func IsSourceFile(filePath string) bool {
+	ext := strings.ToLower(filepath.Ext(filePath))
+	sourceExts := []string{
+		".go", ".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".c", ".cpp", ".cc", ".cxx",
+		".h", ".hpp", ".cs", ".rb", ".php", ".swift", ".kt", ".rs", ".scala", ".clj",
+		".hs", ".ml", ".elm", ".dart", ".vue", ".svelte", ".sol", ".sh", ".bash", ".zsh",
+		".ps1", ".sql", ".graphql", ".gql", ".proto", ".yaml", ".yml", ".json", ".toml",
+		".xml", ".html", ".css", ".scss", ".sass", ".less", ".md", ".rst", ".tex",
+	}
+
+	for _, sourceExt := range sourceExts {
+		if ext == sourceExt {
+			return true
+		}
+	}
+	return false
+}
+
+// WalkSourceFiles walks the workspace and calls the callback for each source file
+func WalkSourceFiles(workspaceRoot string, callback func(filePath string) error) error {
+	return filepath.Walk(workspaceRoot, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip ignored directories
+		if info.IsDir() && ShouldIgnore(info.Name(), true) {
+			return filepath.SkipDir
+		}
+
+		// Process source files
+		if !info.IsDir() && !ShouldIgnore(info.Name(), false) && IsSourceFile(path) {
+			relPath, err := filepath.Rel(workspaceRoot, path)
+			if err != nil {
+				relPath = path
+			}
+
+			return callback(relPath)
+		}
+
+		return nil
+	})
+}
+
+// BuildDirectoryTree builds a visual tree representation of the directory structure
+func BuildDirectoryTree(dirPath string, maxDepth int) (string, error) {
+	return buildDirectoryTree(dirPath, maxDepth, 0, "")
 }
 
 func buildDirectoryTree(dirPath string, maxDepth, currentDepth int, prefix string) (string, error) {
@@ -52,7 +103,7 @@ func buildDirectoryTree(dirPath string, maxDepth, currentDepth int, prefix strin
 	// Filter out ignored entries
 	var filteredEntries []os.DirEntry
 	for _, entry := range entries {
-		if !shouldIgnore(entry.Name(), entry.IsDir()) {
+		if !ShouldIgnore(entry.Name(), entry.IsDir()) {
 			filteredEntries = append(filteredEntries, entry)
 		}
 	}

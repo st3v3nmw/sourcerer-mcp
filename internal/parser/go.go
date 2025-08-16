@@ -22,75 +22,64 @@ func NewGoParser(workspaceRoot string) (*GoParser, error) {
 		ParserBase: ParserBase{
 			workspaceRoot: workspaceRoot,
 			parser:        parser,
-			cache:         map[string]*File{},
 		},
 	}, nil
 }
 
 func (p *GoParser) Chunk(filePath string) (File, error) {
-	file := p.getFileFromCache(filePath)
-	if file != nil && !file.isStale(p.workspaceRoot) {
-		return file.Copy(), nil
-	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	fullPath := path.Join(p.workspaceRoot, filePath)
 	source, err := os.ReadFile(fullPath)
 	if err != nil {
 		return File{}, err
 	}
 
-	if file == nil {
-		file = &File{Path: filePath}
-	}
-
-	tree := p.parser.Parse(source, file.tree)
+	tree := p.parser.Parse(source, nil)
 	if tree == nil {
 		return File{}, fmt.Errorf("couldn't parse %s", filePath)
 	}
 
-	file.Source = source
-	file.ParsedAt = time.Now()
-	file.Chunks = p.extractChunks(tree.RootNode(), source)
+	file := File{
+		Path:     filePath,
+		Source:   source,
+		ParsedAt: time.Now(),
+		Chunks:   p.extractChunks(tree.RootNode(), source),
+		tree:     tree,
+	}
 
-	p.cache[filePath] = file
-
-	return file.Copy(), nil
+	return file, nil
 }
 
 func (p *GoParser) extractChunks(node *tree_sitter.Node, source []byte) []*Chunk {
 	var chunks []*Chunk
+	usedPaths := map[string]bool{}
+
 	for i := uint(0); i < node.ChildCount(); i++ {
 		child := node.Child(i)
 		childKind := child.Kind()
 
 		switch childKind {
 		case "function_declaration":
-			chunks = append(chunks, p.extractFunction(child, source))
+			chunks = append(chunks, p.extractFunction(child, source, usedPaths))
 		case "type_declaration":
-			chunks = append(chunks, p.extractTypeDeclaration(child, source))
+			chunks = append(chunks, p.extractTypeDeclaration(child, source, usedPaths))
 		case "method_declaration":
-			chunks = append(chunks, p.extractMethod(child, source))
+			chunks = append(chunks, p.extractMethod(child, source, usedPaths))
 		default:
-			chunks = append(chunks, p.extractNode(child, source))
+			chunks = append(chunks, p.extractNode(child, source, usedPaths))
 		}
 	}
 
 	return chunks
 }
 
-func (p *GoParser) extractFunction(node *tree_sitter.Node, source []byte) *Chunk {
+func (p *GoParser) extractFunction(node *tree_sitter.Node, source []byte, usedPaths map[string]bool) *Chunk {
 	nameQuery := `(function_declaration name: (identifier) @function_name)`
 	name := p.getTextWithQuery(nameQuery, node, source)
 
-	summary := p.getFilteredNodeSource(node, source, []string{"body"})
-
-	return p.createChunk(node, source, name, summary)
+	return p.createChunk(node, source, name, usedPaths)
 }
 
-func (p *GoParser) extractMethod(node *tree_sitter.Node, source []byte) *Chunk {
+func (p *GoParser) extractMethod(node *tree_sitter.Node, source []byte, usedPaths map[string]bool) *Chunk {
 	nameQuery := `(method_declaration name: (field_identifier) @method_name)`
 	name := p.getTextWithQuery(nameQuery, node, source)
 
@@ -105,14 +94,13 @@ func (p *GoParser) extractMethod(node *tree_sitter.Node, source []byte) *Chunk {
 	receiver := p.getTextWithQuery(receiverQuery, node, source)
 
 	path := receiver + "::" + name
-	summary := p.getFilteredNodeSource(node, source, []string{"body"})
 
-	return p.createChunk(node, source, path, summary)
+	return p.createChunk(node, source, path, usedPaths)
 }
 
-func (p *GoParser) extractTypeDeclaration(node *tree_sitter.Node, source []byte) *Chunk {
+func (p *GoParser) extractTypeDeclaration(node *tree_sitter.Node, source []byte, usedPaths map[string]bool) *Chunk {
 	typeQuery := `(type_declaration (type_spec name: (type_identifier) @type_name))`
 	name := p.getTextWithQuery(typeQuery, node, source)
 
-	return p.createChunk(node, source, name, node.Utf8Text(source))
+	return p.createChunk(node, source, name, usedPaths)
 }

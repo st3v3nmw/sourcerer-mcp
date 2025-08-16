@@ -1,14 +1,16 @@
 package parser
 
 import (
-	"os"
-	"path"
-	"slices"
+	"fmt"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/cespare/xxhash"
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
+)
+
+const (
+	summaryMaxChars = 60
 )
 
 type Parser interface {
@@ -21,8 +23,6 @@ var _ Parser = (*GoParser)(nil)
 type ParserBase struct {
 	workspaceRoot string
 	parser        *tree_sitter.Parser
-	cache         map[string]*File
-	mu            sync.RWMutex
 }
 
 func (p *ParserBase) executeQuery(rawQuery string, node *tree_sitter.Node, source []byte) []*tree_sitter.Node {
@@ -50,60 +50,38 @@ func (p *ParserBase) getTextWithQuery(query string, node *tree_sitter.Node, sour
 	if len(nodes) > 0 {
 		return nodes[0].Utf8Text(source)
 	}
+
 	return ""
 }
 
-func (p *ParserBase) createChunk(node *tree_sitter.Node, source []byte, path, summary string) *Chunk {
-	return &Chunk{
-		Path:      path, // TODO: handle ambiguity when more then one symbol exists at the same level with the same name
-		Summary:   summary,
-		Source:    node.Utf8Text(source),
-		StartByte: node.StartByte(),
-		EndByte:   node.EndByte(),
-		node:      node,
-	}
-}
-
-func (p *ParserBase) getFileFromCache(filePath string) *File {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-
-	file, exists := p.cache[filePath]
-	if !exists {
-		return nil
-	}
-
-	return file
-}
-
-func (p *ParserBase) extractNode(node *tree_sitter.Node, source []byte) *Chunk {
-	nodeSource := node.Utf8Text(source)
-	return &Chunk{
-		Summary:   nodeSource,
-		Source:    nodeSource,
-		StartByte: node.StartByte(),
-		EndByte:   node.EndByte(),
-		node:      node,
-	}
-}
-
-func (p *ParserBase) getFilteredNodeSource(node *tree_sitter.Node, source []byte, exclude []string) string {
-	slices.Sort(exclude)
-
-	var parts []string
-	for i := uint(0); i < node.ChildCount(); i++ {
-		child := node.Child(i)
-
-		fieldName := node.FieldNameForChild(uint32(i))
-		_, found := slices.BinarySearch(exclude, fieldName)
-		if found {
-			continue
+func (p *ParserBase) createChunk(node *tree_sitter.Node, source []byte, path string, usedPaths map[string]bool) *Chunk {
+	finalPath := path
+	if usedPaths[path] {
+		counter := 2
+		for usedPaths[fmt.Sprintf("%s-%d", path, counter)] {
+			counter++
 		}
 
-		parts = append(parts, child.Utf8Text(source))
+		finalPath = fmt.Sprintf("%s-%d", path, counter)
 	}
+	usedPaths[finalPath] = true
 
-	return strings.Join(parts, " ")
+	sourceText := node.Utf8Text(source)
+
+	return &Chunk{
+		Path:      finalPath,
+		Summary:   summarize(sourceText),
+		Source:    sourceText,
+		StartByte: node.StartByte(),
+		EndByte:   node.EndByte(),
+		node:      node,
+	}
+}
+
+func (p *ParserBase) extractNode(node *tree_sitter.Node, source []byte, usedPaths map[string]bool) *Chunk {
+	nodeSource := node.Utf8Text(source)
+	hash := fmt.Sprintf("%x", xxhash.Sum64String(nodeSource))
+	return p.createChunk(node, source, hash, usedPaths)
 }
 
 func (p *ParserBase) Close() {
@@ -117,16 +95,6 @@ type File struct {
 	ParsedAt time.Time
 
 	tree *tree_sitter.Tree
-}
-
-func (f *File) isStale(workspaceRoot string) bool {
-	fullPath := path.Join(workspaceRoot, f.Path)
-	fileInfo, err := os.Stat(fullPath)
-	if err != nil {
-		return false
-	}
-
-	return f.ParsedAt.Before(fileInfo.ModTime())
 }
 
 func (f *File) Copy() File {
@@ -162,4 +130,23 @@ type Chunk struct {
 	Children []*Chunk
 
 	node *tree_sitter.Node
+}
+
+func summarize(source string) string {
+	lines := strings.Split(source, "\n")
+	if len(lines) == 0 {
+		return ""
+	}
+
+	firstLine := strings.TrimSpace(lines[0])
+	if len(firstLine) <= summaryMaxChars {
+		return firstLine
+	}
+
+	nextSpace := strings.Index(firstLine[summaryMaxChars:], " ")
+	if nextSpace >= 0 {
+		return firstLine[:summaryMaxChars+nextSpace] + "..."
+	}
+
+	return firstLine[:summaryMaxChars] + "..."
 }
