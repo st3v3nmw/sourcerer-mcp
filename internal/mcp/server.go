@@ -3,14 +3,11 @@ package mcp
 import (
 	"context"
 	"fmt"
-	"os"
-	"path"
 	"strings"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/st3v3nmw/sourcerer-mcp/internal/editor"
-	"github.com/st3v3nmw/sourcerer-mcp/internal/fs"
 )
 
 type Server struct {
@@ -34,9 +31,9 @@ func NewServer(workspaceRoot string) (*Server, error) {
 		"Sourcerer",
 		"1.0.0",
 		server.WithInstructions(`
-You have access to Sourcerer MCP tools for efficient codebase navigation and editing.
+You have access to Sourcerer MCP tools for efficient codebase navigation.
 Sourcerer provides surgical precision - you can jump directly to specific functions,
-classes, and code chunks without reading entire files or burning tokens on broad exploration.
+classes, and code chunks without reading entire files, reducing token waste.
 
 SEARCH STRATEGY:
 Sourcerer's semantic search understands concepts and relationships.
@@ -44,8 +41,6 @@ Describe what you're looking for conceptually and functionally:
 
 Good queries:
 - "user authentication and session management logic"
-- "error handling and exception processing code"
-- "file parsing and syntax analysis"
 - "database operations and data persistence"
 - "HTTP request routing and API endpoints"
 - "configuration loading and environment setup"
@@ -59,32 +54,26 @@ Effective approaches:
 CHUNK IDs:
 Chunks use stable addressing: path/to/file.ext::ClassName::methodName
 - Classes: src/auth.js::AuthService
-- Functions: src/auth.js::AuthService::login
+- Methods: src/auth.js::AuthService::login
 - Top-level: src/utils.js::validateEmail
 - Unnamed chunks, like imports: src/utils.js::af81a7ff
 
-This addressing is persistent and won't break with minor code changes.
-Use get_source_code with these precise ids to get exactly the code you need.
+Chunk IDs are stable across minor edits but update when code structure changes
+(renames, moves, deletions). Use get_source_code with these precise ids to get
+exactly the code you need.
 
 BATCHING:
-Prefer batched operations - get_table_of_contents for multiple files, get_source_code for multiple chunks.
+Prefer batched operations - get_tocs for multiple files, get_source_code for multiple chunks.
 When you need multiple related chunks, collect the chunk ids first then batch them in
 a single get_source_code call.
 This is better than making separate requests which waste tokens and time (round-trips).
-`),
-	)
 
-	s.mcp.AddTool(
-		mcp.NewTool("list_files",
-			mcp.WithDescription("Understand project structure and find entry points"),
-			mcp.WithString("in",
-				mcp.Description("Directory path to explore e.g., 'pkg/fs', '.' for root"),
-			),
-			mcp.WithNumber("depth",
-				mcp.Description("How many levels deep to traverse (default: 3)"),
-			),
-		),
-		s.listFiles,
+WHEN NOT TO USE:
+- Pattern searching (regex, exact text matches, etc)
+- When you need complete file content
+- Exploring file/directory structure (use standard file operations)
+- Reading configuration or data files
+`),
 	)
 
 	s.mcp.AddTool(
@@ -99,7 +88,7 @@ This is better than making separate requests which waste tokens and time (round-
 	)
 
 	s.mcp.AddTool(
-		mcp.NewTool("get_table_of_contents",
+		mcp.NewTool("get_tocs",
 			mcp.WithDescription("Get table of contents showing file structure and chunk IDs"),
 			mcp.WithArray("files",
 				mcp.WithStringItems(),
@@ -108,7 +97,7 @@ This is better than making separate requests which waste tokens and time (round-
 				mcp.Description("File paths to analyze"),
 			),
 		),
-		s.getTableOfContents,
+		s.getTOCs,
 	)
 
 	s.mcp.AddTool(
@@ -134,28 +123,6 @@ func (s *Server) Serve() error {
 	return server.ServeStdio(s.mcp)
 }
 
-func (s *Server) listFiles(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	in := request.GetString("in", ".")
-	depth := request.GetInt("depth", 3)
-
-	dirPath := path.Join(s.workspaceRoot, in)
-	info, err := os.Stat(dirPath)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to access directory: %v", err)), nil
-	}
-
-	if !info.IsDir() {
-		return mcp.NewToolResultError(fmt.Sprintf("Path is not a directory: %s", dirPath)), nil
-	}
-
-	result, err := fs.BuildDirectoryTree(dirPath, depth)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Failed to build directory tree: %v", err)), nil
-	}
-
-	return mcp.NewToolResultText(result), nil
-}
-
 func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query := request.GetString("query", "")
 
@@ -172,7 +139,7 @@ func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest
 	return mcp.NewToolResultText(content), nil
 }
 
-func (s *Server) getTableOfContents(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (s *Server) getTOCs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	filePaths := request.GetStringSlice("files", []string{})
 	tocs := s.editor.GetTOCs(ctx, filePaths)
 	return mcp.NewToolResultText(tocs), nil
