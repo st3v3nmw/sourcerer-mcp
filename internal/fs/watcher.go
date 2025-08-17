@@ -21,8 +21,8 @@ type Watcher struct {
 	handler          FileChangeHandler
 	fsWatcher        *fsnotify.Watcher
 	debounceTimer    *time.Timer
-	pendingChanges   map[string]bool
-	mu               sync.Mutex
+	pendingFiles     map[string]bool
+	mu               sync.RWMutex
 	debounceDuration time.Duration
 	ctx              context.Context
 	cancel           context.CancelFunc
@@ -40,7 +40,7 @@ func NewWatcher(ctx context.Context, workspaceRoot string, supportedExts []strin
 		filter:           NewFileFilter(workspaceRoot, supportedExts),
 		handler:          handler,
 		fsWatcher:        fsWatcher,
-		pendingChanges:   map[string]bool{},
+		pendingFiles:     map[string]bool{},
 		debounceDuration: debounceDuration,
 		ctx:              ctx,
 		cancel:           cancel,
@@ -103,13 +103,13 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 		return
 	}
 
-	w.pendingChanges[relPath] = true
+	w.pendingFiles[relPath] = true
 
 	if w.debounceTimer != nil {
 		w.debounceTimer.Stop()
 	}
 
-	w.debounceTimer = time.AfterFunc(w.debounceDuration, w.processPendingChanges)
+	w.debounceTimer = time.AfterFunc(w.debounceDuration, w.processPendingFiles)
 }
 
 func (w *Watcher) shouldIgnoreEvent(event fsnotify.Event) bool {
@@ -120,12 +120,12 @@ func (w *Watcher) shouldIgnoreEvent(event fsnotify.Event) bool {
 	return w.filter.ShouldIgnore(event.Name)
 }
 
-func (w *Watcher) processPendingChanges() {
+func (w *Watcher) processPendingFiles() {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	changes := make([]string, 0, len(w.pendingChanges))
-	for filePath := range w.pendingChanges {
+	changes := make([]string, 0, len(w.pendingFiles))
+	for filePath := range w.pendingFiles {
 		changes = append(changes, filePath)
 	}
 
@@ -133,7 +133,7 @@ func (w *Watcher) processPendingChanges() {
 		w.handler(w.ctx, changes)
 	}
 
-	w.pendingChanges = map[string]bool{}
+	w.pendingFiles = map[string]bool{}
 }
 
 func (w *Watcher) FlushPending() {
@@ -143,6 +143,13 @@ func (w *Watcher) FlushPending() {
 	if w.debounceTimer != nil {
 		w.debounceTimer.Reset(0)
 	}
+}
+
+func (w *Watcher) PendingCount() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return len(w.pendingFiles)
 }
 
 func (w *Watcher) Close() error {

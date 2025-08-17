@@ -50,6 +50,7 @@ func New(ctx context.Context, workspaceRoot string) (*Index, error) {
 }
 
 func (idx *Index) loadFileMetadata(ctx context.Context) {
+	seen := map[string]bool{}
 	chunkIDs := idx.collection.ListIDs(ctx)
 	for _, chunkID := range chunkIDs {
 		parts := strings.SplitN(chunkID, "::", 2)
@@ -59,18 +60,26 @@ func (idx *Index) loadFileMetadata(ctx context.Context) {
 
 		filePath := parts[0]
 		_, exists := idx.fileMetadata[filePath]
-		if !exists {
+		if !exists && !seen[filePath] {
 			chunk, err := idx.GetChunk(ctx, chunkID)
 			if err != nil {
+				continue
+			}
+
+			seen[filePath] = true
+			if !idx.IsStale(filePath) {
+				where := map[string]string{"file": filePath}
+				idx.collection.Delete(ctx, where, nil)
 				continue
 			}
 
 			idx.fileMetadata[filePath] = chunk.ParsedAt
 		}
 	}
+
 }
 
-func (idx *Index) ShouldIndex(filePath string) bool {
+func (idx *Index) IsStale(filePath string) bool {
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		return false
@@ -98,7 +107,6 @@ func (idx *Index) Index(ctx context.Context, file *parser.File) error {
 	}
 
 	docs := []chromem.Document{}
-	chunkIDs := []string{}
 	for _, chunk := range file.Chunks {
 		doc := chromem.Document{
 			ID: chunk.ID(),
@@ -116,7 +124,6 @@ func (idx *Index) Index(ctx context.Context, file *parser.File) error {
 		}
 
 		docs = append(docs, doc)
-		chunkIDs = append(chunkIDs, chunk.ID())
 	}
 
 	err = idx.collection.AddDocuments(ctx, docs, runtime.NumCPU())
@@ -125,9 +132,8 @@ func (idx *Index) Index(ctx context.Context, file *parser.File) error {
 	}
 
 	idx.metadataMu.Lock()
-	defer idx.metadataMu.Unlock()
-
 	idx.fileMetadata[file.Path] = file.Chunks[0].ParsedAt
+	idx.metadataMu.Unlock()
 
 	return nil
 }

@@ -4,6 +4,7 @@ go 1.24.5
 
 require (
 	github.com/cespare/xxhash v1.1.0
+	github.com/dustin/go-humanize v1.0.1
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/mark3labs/mcp-go v0.37.0
 	github.com/philippgille/chromem-go v0.7.1-0.20250720180857-4e5d21d5b8ce

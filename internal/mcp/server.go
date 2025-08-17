@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dustin/go-humanize"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/st3v3nmw/sourcerer-mcp/internal/analyzer"
@@ -92,7 +93,7 @@ This is better than making separate requests which waste tokens and time (round-
 			mcp.WithDescription("Find relevant code using semantic understanding"),
 			mcp.WithString("query",
 				mcp.Required(),
-				mcp.Description("Your search, returns chunk ids, a chunk summary, and line numbers"),
+				mcp.Description("Your search"),
 			),
 		),
 		s.semanticSearch,
@@ -114,6 +115,20 @@ This is better than making separate requests which waste tokens and time (round-
 		s.getSourceCode,
 	)
 
+	s.mcp.AddTool(
+		mcp.NewTool("index_workspace",
+			mcp.WithDescription("Index or re-index the entire workspace"),
+		),
+		s.indexWorkspace,
+	)
+
+	s.mcp.AddTool(
+		mcp.NewTool("get_index_status",
+			mcp.WithDescription("Get the codebase's indexing status"),
+		),
+		s.getIndexStatus,
+	)
+
 	return s, nil
 }
 
@@ -126,7 +141,7 @@ func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest
 
 	results, err := s.analyzer.SemanticSearch(ctx, query)
 	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("search failed: %v", err)), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Search failed: %v", err)), nil
 	}
 
 	if len(results) == 0 {
@@ -141,6 +156,24 @@ func (s *Server) getSourceCode(ctx context.Context, request mcp.CallToolRequest)
 	ids := request.GetStringSlice("ids", []string{})
 	chunks := s.analyzer.GetChunkSources(ctx, ids)
 	return mcp.NewToolResultText(chunks), nil
+}
+
+func (s *Server) indexWorkspace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	go s.analyzer.IndexWorkspace(ctx)
+	return mcp.NewToolResultText("Indexing in progress..."), nil
+}
+
+func (s *Server) getIndexStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pendingFiles, lastIndexedAt := s.analyzer.GetIndexStatus()
+
+	status := fmt.Sprintf("#. pending files: %d, last indexed: ", pendingFiles)
+	if lastIndexedAt.IsZero() {
+		status += "in progress"
+	} else {
+		status += humanize.Time(lastIndexedAt)
+	}
+
+	return mcp.NewToolResultText(status), nil
 }
 
 func (s *Server) Close() error {

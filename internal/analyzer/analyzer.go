@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/st3v3nmw/sourcerer-mcp/internal/fs"
 	"github.com/st3v3nmw/sourcerer-mcp/internal/index"
@@ -14,8 +16,12 @@ import (
 type Analyzer struct {
 	workspaceRoot string
 	parsers       map[Language]parser.Parser
-	index         *index.Index
 	watcher       *fs.Watcher
+
+	index         *index.Index
+	indexMu       sync.RWMutex
+	nPendingFiles int
+	lastIndexedAt time.Time
 }
 
 func New(ctx context.Context, workspaceRoot string) (*Analyzer, error) {
@@ -30,7 +36,7 @@ func New(ctx context.Context, workspaceRoot string) (*Analyzer, error) {
 		index:         index,
 	}
 
-	analyzer.indexWorkspace(ctx)
+	go analyzer.IndexWorkspace(ctx)
 
 	w, err := fs.NewWatcher(
 		ctx,
@@ -46,11 +52,12 @@ func New(ctx context.Context, workspaceRoot string) (*Analyzer, error) {
 	return analyzer, nil
 }
 
-func (a *Analyzer) indexWorkspace(ctx context.Context) {
-	var filesToProcess []string
+func (a *Analyzer) IndexWorkspace(ctx context.Context) {
+	a.flushPendingChanges()
 
+	var filesToProcess []string
 	fs.WalkSourceFiles(a.workspaceRoot, languages.supportedExts(), func(filePath string) error {
-		if a.index.ShouldIndex(filePath) {
+		if a.index.IsStale(filePath) {
 			filesToProcess = append(filesToProcess, filePath)
 		}
 
@@ -65,9 +72,22 @@ func (a *Analyzer) handleFileChange(ctx context.Context, filePaths []string) {
 }
 
 func (a *Analyzer) processFiles(ctx context.Context, filePaths []string) {
+	if len(filePaths) == 0 {
+		return
+	}
+
+	a.nPendingFiles = len(filePaths)
 	for _, filePath := range filePaths {
 		a.chunk(ctx, filePath)
+
+		a.indexMu.Lock()
+		a.nPendingFiles = max(a.nPendingFiles-1, 0)
+		a.indexMu.Unlock()
 	}
+
+	a.indexMu.Lock()
+	a.lastIndexedAt = time.Now()
+	a.indexMu.Unlock()
 }
 
 func (a *Analyzer) getParser(filePath string) (parser.Parser, error) {
@@ -136,6 +156,19 @@ func (a *Analyzer) getChunkSource(ctx context.Context, id string) string {
 	}
 
 	return fmt.Sprintf("== %s ==\n\n%s\n\n", id, chunk.Source)
+}
+
+func (a *Analyzer) GetIndexStatus() (int, time.Time) {
+	a.indexMu.RLock()
+	pendingFiles := a.nPendingFiles
+	lastIndexedAt := a.lastIndexedAt
+	a.indexMu.RUnlock()
+
+	if a.watcher != nil {
+		pendingFiles += a.watcher.PendingCount()
+	}
+
+	return pendingFiles, lastIndexedAt
 }
 
 func (a *Analyzer) Close() {
