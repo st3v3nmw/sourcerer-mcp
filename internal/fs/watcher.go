@@ -113,7 +113,7 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 }
 
 func (w *Watcher) shouldIgnoreEvent(event fsnotify.Event) bool {
-	if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
+	if event.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove) == 0 {
 		return true
 	}
 

@@ -67,7 +67,8 @@ Use it for "authentication logic" or "error handling patterns",
 not "Parser interface" or "ExtractReferences function".
 
 CHUNK IDs:
-Chunks use stable addressing: path/to/file.ext::TypeName::methodName
+Apart from summaries & line numbers, search returns chunk IDs
+like: path/to/file.ext::TypeName::methodName, e.g.
 - Classes: src/auth.js::AuthService
 - Methods: src/auth.js::AuthService::login
 - Top-level: src/utils.js::validateEmail
@@ -90,7 +91,7 @@ This is better than making separate requests which waste tokens and time (round-
 
 	s.mcp.AddTool(
 		mcp.NewTool("semantic_search",
-			mcp.WithDescription("Find relevant code using semantic understanding"),
+			mcp.WithDescription("Find relevant code using semantic search"),
 			mcp.WithString("query",
 				mcp.Required(),
 				mcp.Description("Your search"),
@@ -166,7 +167,7 @@ func (s *Server) indexWorkspace(ctx context.Context, request mcp.CallToolRequest
 func (s *Server) getIndexStatus(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	pendingFiles, lastIndexedAt := s.analyzer.GetIndexStatus()
 
-	status := fmt.Sprintf("#. pending files: %d, last indexed: ", pendingFiles)
+	status := fmt.Sprintf("Number of pending files: %d, last indexed: ", pendingFiles)
 	if lastIndexedAt.IsZero() {
 		status += "in progress"
 	} else {
