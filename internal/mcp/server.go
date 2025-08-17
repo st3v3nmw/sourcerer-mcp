@@ -33,7 +33,7 @@ func NewServer(workspaceRoot string) (*Server, error) {
 		server.WithInstructions(`
 You have access to Sourcerer MCP tools for efficient codebase navigation.
 Sourcerer provides surgical precision - you can jump directly to specific functions,
-classes, and code chunks without reading entire files, reducing token waste.
+classes, and code chunks without reading entire files, reducing token waste & cognitive load.
 
 SEARCH STRATEGY:
 Sourcerer's semantic search understands concepts and relationships.
@@ -63,14 +63,13 @@ Chunk IDs are stable across minor edits but update when code structure changes
 exactly the code you need.
 
 BATCHING:
-Prefer batched operations - get_tocs for multiple files, get_source_code for multiple chunks.
 When you need multiple related chunks, collect the chunk ids first then batch them in
 a single get_source_code call.
 This is better than making separate requests which waste tokens and time (round-trips).
 
 WHEN NOT TO USE:
-- Pattern searching e.g. finding occurrences of specific strings or identifiers
-- Exploring file/directory structure (use standard file operations)
+- Pattern searching (use existing pattern matching & grep tools)
+- Exploring directory structure & project layout (use existing tools)
 - When you need to read the full file
 - Reading configuration or data files
 `),
@@ -81,7 +80,7 @@ WHEN NOT TO USE:
 			mcp.WithDescription("Find relevant code using semantic understanding"),
 			mcp.WithString("query",
 				mcp.Required(),
-				mcp.Description("Your search, returns chunk ids and a small summary of that chunk"),
+				mcp.Description("Your search, returns chunk ids, a chunk summary, and line numbers"),
 			),
 		),
 		s.semanticSearch,

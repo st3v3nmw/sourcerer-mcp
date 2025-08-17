@@ -1,11 +1,6 @@
 package parser
 
 import (
-	"fmt"
-	"os"
-	"path"
-	"time"
-
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
 	tree_sitter_go "github.com/tree-sitter/tree-sitter-go/bindings/go"
 )
@@ -26,24 +21,15 @@ func NewGoParser(workspaceRoot string) (*GoParser, error) {
 	}, nil
 }
 
-func (p *GoParser) Chunk(filePath string) (File, error) {
-	fullPath := path.Join(p.workspaceRoot, filePath)
-	source, err := os.ReadFile(fullPath)
+func (p *GoParser) Chunk(filePath string) (*File, error) {
+	file, err := p.parse(filePath)
 	if err != nil {
-		return File{}, err
+		return nil, err
 	}
 
-	tree := p.parser.Parse(source, nil)
-	if tree == nil {
-		return File{}, fmt.Errorf("couldn't parse %s", filePath)
-	}
-
-	file := File{
-		Path:     filePath,
-		Source:   source,
-		ParsedAt: time.Now(),
-		Chunks:   p.extractChunks(tree.RootNode(), source),
-		tree:     tree,
+	file.Chunks = p.extractChunks(file.tree.RootNode(), file.Source)
+	for i := range len(file.Chunks) {
+		file.Chunks[i].File = file.Path
 	}
 
 	return file, nil

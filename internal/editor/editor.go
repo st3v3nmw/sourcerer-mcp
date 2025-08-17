@@ -3,7 +3,6 @@ package editor
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -72,16 +71,11 @@ func (e *Editor) getParser(filePath string) (parser.Parser, error) {
 }
 
 func (e *Editor) chunk(ctx context.Context, filePath string) error {
-	info, err := os.Stat(filePath)
-	if err != nil {
-		return err
-	}
-
 	if paths, exists := e.files[filePath]; exists {
 		allFresh := true
 		for _, chunkPath := range paths {
 			id := filePath + "::" + chunkPath
-			isStale, err := e.index.IsChunkStale(ctx, id, info.ModTime())
+			isStale, err := e.index.IsChunkStale(ctx, id)
 			if err != nil || isStale {
 				allFresh = false
 				break
@@ -103,7 +97,7 @@ func (e *Editor) chunk(ctx context.Context, filePath string) error {
 		return err
 	}
 
-	err = e.index.Upsert(ctx, &file)
+	err = e.index.Upsert(ctx, file)
 	if err != nil {
 		return err
 	}
