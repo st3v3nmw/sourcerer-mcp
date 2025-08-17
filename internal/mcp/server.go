@@ -56,7 +56,7 @@ and file location from previous context, construct the chunk ID yourself
 and use get_source_code directly rather than wastefully searching again.
 
 CHUNK IDs:
-Chunks use stable addressing: path/to/file.ext::ClassName::methodName
+Chunks use stable addressing: path/to/file.ext::TypeName::methodName
 - Classes: src/auth.js::AuthService
 - Methods: src/auth.js::AuthService::login
 - Top-level: src/utils.js::validateEmail
