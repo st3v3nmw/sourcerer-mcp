@@ -112,42 +112,6 @@ func (a *Analyzer) chunk(ctx context.Context, filePath string) error {
 	return nil
 }
 
-func (a *Analyzer) getTOC(ctx context.Context, filePath string) string {
-	a.chunk(ctx, filePath)
-
-	toc := fmt.Sprintf("== %s ==\n\n", filePath)
-
-	paths, exists := a.files[filePath]
-	if !exists {
-		return toc + "<file not found or could not be processed>\n\n"
-	}
-
-	for _, chunkPath := range paths {
-		id := filePath + "::" + chunkPath
-		chunk, err := a.index.GetChunk(ctx, id)
-		if err != nil {
-			continue
-		}
-
-		if chunk.Path != "" {
-			toc += "::" + chunk.Path + "\n"
-		}
-
-		toc += chunk.Summary + "\n\n"
-	}
-
-	return toc
-}
-
-func (a *Analyzer) GetTOCs(ctx context.Context, filePaths []string) string {
-	tocs := ""
-	for _, filePath := range filePaths {
-		tocs += a.getTOC(ctx, filePath)
-		tocs += "\n"
-	}
-
-	return tocs
-}
 
 func (a *Analyzer) getChunkSource(ctx context.Context, id string) string {
 	parts := strings.SplitN(id, "::", 2)

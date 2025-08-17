@@ -132,11 +132,7 @@ func (idx *Index) IsChunkStale(ctx context.Context, id string) (bool, error) {
 func (idx *Index) GetAllChunkIDs(ctx context.Context) map[string][]string {
 	ids := idx.collection.ListIDs(ctx)
 
-	fileChunks := make(map[string][]struct {
-		id        string
-		startLine uint
-	})
-
+	result := make(map[string][]string)
 	staleChunkIDs := []string{}
 	for _, id := range ids {
 		chunk, err := idx.GetChunk(ctx, id)
@@ -149,26 +145,7 @@ func (idx *Index) GetAllChunkIDs(ctx context.Context) map[string][]string {
 			continue
 		}
 
-		fileChunks[chunk.File] = append(fileChunks[chunk.File], struct {
-			id        string
-			startLine uint
-		}{
-			id:        id,
-			startLine: chunk.StartLine,
-		})
-	}
-
-	result := make(map[string][]string)
-	for filePath, chunks := range fileChunks {
-		sort.Slice(chunks, func(i, j int) bool {
-			return chunks[i].startLine < chunks[j].startLine
-		})
-
-		chunkIDs := make([]string, len(chunks))
-		for i, chunk := range chunks {
-			chunkIDs[i] = chunk.id
-		}
-		result[filePath] = chunkIDs
+		result[chunk.File] = append(result[chunk.File], id)
 	}
 
 	if len(staleChunkIDs) > 0 {

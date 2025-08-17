@@ -91,19 +91,6 @@ WHEN NOT TO USE:
 	)
 
 	s.mcp.AddTool(
-		mcp.NewTool("get_tocs",
-			mcp.WithDescription("Get table of contents showing file structure and chunk IDs"),
-			mcp.WithArray("files",
-				mcp.WithStringItems(),
-				mcp.MinItems(1),
-				mcp.Required(),
-				mcp.Description("File paths to analyze"),
-			),
-		),
-		s.getTOCs,
-	)
-
-	s.mcp.AddTool(
 		mcp.NewTool("get_source_code",
 			mcp.WithDescription("Get the actual code you need to examine/modify"),
 			mcp.WithArray("ids",
@@ -140,12 +127,6 @@ func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest
 
 	content := strings.Join(results, "\n")
 	return mcp.NewToolResultText(content), nil
-}
-
-func (s *Server) getTOCs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	filePaths := request.GetStringSlice("files", []string{})
-	tocs := s.analyzer.GetTOCs(ctx, filePaths)
-	return mcp.NewToolResultText(tocs), nil
 }
 
 func (s *Server) getSourceCode(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
