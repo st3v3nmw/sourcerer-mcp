@@ -7,24 +7,24 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/st3v3nmw/sourcerer-mcp/internal/editor"
+	"github.com/st3v3nmw/sourcerer-mcp/internal/analyzer"
 )
 
 type Server struct {
 	workspaceRoot string
 	mcp           *server.MCPServer
-	editor        *editor.Editor
+	analyzer      *analyzer.Analyzer
 }
 
 func NewServer(workspaceRoot string) (*Server, error) {
-	e, err := editor.New(context.Background(), workspaceRoot)
+	a, err := analyzer.New(context.Background(), workspaceRoot)
 	if err != nil {
 		return nil, err
 	}
 
 	s := &Server{
 		workspaceRoot: workspaceRoot,
-		editor:        e,
+		analyzer:      a,
 	}
 
 	s.mcp = server.NewMCPServer(
@@ -51,9 +51,9 @@ Effective approaches:
 - Include context about what the code should accomplish
 - Mention related functionality or typical patterns
 
-If you already know the specific function/class/method/struct/etc name and file location
-from previous context, construct the chunk ID directly (e.g. file.ext::ClassName::methodName)
-and use get_source_code rather than wastefully searching again.
+AVOID REDUNDANT SEARCHES: If you already know the specific function/class/method/struct/etc
+and file location from previous context, construct the chunk ID yourself
+and use get_source_code directly rather than wastefully searching again.
 
 CHUNK IDs:
 Chunks use stable addressing: path/to/file.ext::ClassName::methodName
@@ -129,7 +129,7 @@ func (s *Server) Serve() error {
 func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query := request.GetString("query", "")
 
-	results, err := s.editor.SemanticSearch(ctx, query)
+	results, err := s.analyzer.SemanticSearch(ctx, query)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("search failed: %v", err)), nil
 	}
@@ -144,19 +144,19 @@ func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest
 
 func (s *Server) getTOCs(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	filePaths := request.GetStringSlice("files", []string{})
-	tocs := s.editor.GetTOCs(ctx, filePaths)
+	tocs := s.analyzer.GetTOCs(ctx, filePaths)
 	return mcp.NewToolResultText(tocs), nil
 }
 
 func (s *Server) getSourceCode(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	ids := request.GetStringSlice("ids", []string{})
-	chunks := s.editor.GetChunkSources(ctx, ids)
+	chunks := s.analyzer.GetChunkSources(ctx, ids)
 	return mcp.NewToolResultText(chunks), nil
 }
 
 func (s *Server) Close() error {
-	if s.editor != nil {
-		s.editor.Close()
+	if s.analyzer != nil {
+		s.analyzer.Close()
 	}
 
 	return nil

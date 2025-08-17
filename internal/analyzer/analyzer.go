@@ -1,4 +1,4 @@
-package editor
+package analyzer
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/st3v3nmw/sourcerer-mcp/internal/parser"
 )
 
-type Editor struct {
+type Analyzer struct {
 	workspaceRoot string
 	parsers       map[Language]parser.Parser
 	files         map[string][]string // file path -> chunk paths
@@ -20,13 +20,13 @@ type Editor struct {
 	initialIndexingDone chan struct{}
 }
 
-func New(ctx context.Context, workspaceRoot string) (*Editor, error) {
+func New(ctx context.Context, workspaceRoot string) (*Analyzer, error) {
 	index, err := index.New(workspaceRoot)
 	if err != nil {
 		return nil, err
 	}
 
-	editor := &Editor{
+	analyzer := &Analyzer{
 		workspaceRoot:       workspaceRoot,
 		parsers:             map[Language]parser.Parser{},
 		files:               map[string][]string{},
@@ -43,39 +43,39 @@ func New(ctx context.Context, workspaceRoot string) (*Editor, error) {
 				chunkPaths[i] = parts[1]
 			}
 		}
-		editor.files[filePath] = chunkPaths
+		analyzer.files[filePath] = chunkPaths
 	}
 
-	editor.indexWorkspace(ctx)
+	analyzer.indexWorkspace(ctx)
 
-	return editor, nil
+	return analyzer, nil
 }
 
-func (e *Editor) indexWorkspace(ctx context.Context) {
-	fs.WalkSourceFiles(e.workspaceRoot, languages.supportedExts(), func(filePath string) error {
-		e.chunk(ctx, filePath)
+func (a *Analyzer) indexWorkspace(ctx context.Context) {
+	fs.WalkSourceFiles(a.workspaceRoot, languages.supportedExts(), func(filePath string) error {
+		a.chunk(ctx, filePath)
 		return nil
 	})
 
-	close(e.initialIndexingDone)
+	close(a.initialIndexingDone)
 }
 
-func (e *Editor) getParser(filePath string) (parser.Parser, error) {
+func (a *Analyzer) getParser(filePath string) (parser.Parser, error) {
 	lang := languages.detect(filepath.Ext(filePath))
-	parser, exists := e.parsers[lang]
+	parser, exists := a.parsers[lang]
 	if exists {
 		return parser, nil
 	}
 
-	return languages.createParser(e.workspaceRoot, lang)
+	return languages.createParser(a.workspaceRoot, lang)
 }
 
-func (e *Editor) chunk(ctx context.Context, filePath string) error {
-	if paths, exists := e.files[filePath]; exists {
+func (a *Analyzer) chunk(ctx context.Context, filePath string) error {
+	if paths, exists := a.files[filePath]; exists {
 		allFresh := true
 		for _, chunkPath := range paths {
 			id := filePath + "::" + chunkPath
-			isStale, err := e.index.IsChunkStale(ctx, id)
+			isStale, err := a.index.IsChunkStale(ctx, id)
 			if err != nil || isStale {
 				allFresh = false
 				break
@@ -87,7 +87,7 @@ func (e *Editor) chunk(ctx context.Context, filePath string) error {
 		}
 	}
 
-	parser, err := e.getParser(filePath)
+	parser, err := a.getParser(filePath)
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (e *Editor) chunk(ctx context.Context, filePath string) error {
 		return err
 	}
 
-	err = e.index.Upsert(ctx, file)
+	err = a.index.Upsert(ctx, file)
 	if err != nil {
 		return err
 	}
@@ -107,24 +107,24 @@ func (e *Editor) chunk(ctx context.Context, filePath string) error {
 		paths[i] = chunk.Path
 	}
 
-	e.files[filePath] = paths
+	a.files[filePath] = paths
 
 	return nil
 }
 
-func (e *Editor) getTOC(ctx context.Context, filePath string) string {
-	e.chunk(ctx, filePath)
+func (a *Analyzer) getTOC(ctx context.Context, filePath string) string {
+	a.chunk(ctx, filePath)
 
 	toc := fmt.Sprintf("== %s ==\n\n", filePath)
 
-	paths, exists := e.files[filePath]
+	paths, exists := a.files[filePath]
 	if !exists {
 		return toc + "<file not found or could not be processed>\n\n"
 	}
 
 	for _, chunkPath := range paths {
 		id := filePath + "::" + chunkPath
-		chunk, err := e.index.GetChunk(ctx, id)
+		chunk, err := a.index.GetChunk(ctx, id)
 		if err != nil {
 			continue
 		}
@@ -139,28 +139,28 @@ func (e *Editor) getTOC(ctx context.Context, filePath string) string {
 	return toc
 }
 
-func (e *Editor) GetTOCs(ctx context.Context, filePaths []string) string {
+func (a *Analyzer) GetTOCs(ctx context.Context, filePaths []string) string {
 	tocs := ""
 	for _, filePath := range filePaths {
-		tocs += e.getTOC(ctx, filePath)
+		tocs += a.getTOC(ctx, filePath)
 		tocs += "\n"
 	}
 
 	return tocs
 }
 
-func (e *Editor) getChunkSource(ctx context.Context, id string) string {
+func (a *Analyzer) getChunkSource(ctx context.Context, id string) string {
 	parts := strings.SplitN(id, "::", 2)
 	if len(parts) != 2 {
 		return fmt.Sprintf("== %s ==\n\n<invalid chunk id>\n\n", id)
 	}
 
-	err := e.chunk(ctx, parts[0])
+	err := a.chunk(ctx, parts[0])
 	if err != nil {
 		return fmt.Sprintf("== %s ==\n\n<processing error: %v>\n\n", id, err)
 	}
 
-	chunk, err := e.index.GetChunk(ctx, id)
+	chunk, err := a.index.GetChunk(ctx, id)
 	if err != nil {
 		return fmt.Sprintf("== %s ==\n\n<source not found for chunk>\n\n", id)
 	}
@@ -168,22 +168,22 @@ func (e *Editor) getChunkSource(ctx context.Context, id string) string {
 	return fmt.Sprintf("== %s ==\n\n%s\n\n", id, chunk.Source)
 }
 
-func (e *Editor) GetChunkSources(ctx context.Context, ids []string) string {
+func (a *Analyzer) GetChunkSources(ctx context.Context, ids []string) string {
 	chunks := ""
 	for _, id := range ids {
-		chunks += e.getChunkSource(ctx, id)
+		chunks += a.getChunkSource(ctx, id)
 	}
 
 	return chunks
 }
 
-func (e *Editor) SemanticSearch(ctx context.Context, query string) ([]string, error) {
-	<-e.initialIndexingDone
-	return e.index.Search(ctx, query)
+func (a *Analyzer) SemanticSearch(ctx context.Context, query string) ([]string, error) {
+	<-a.initialIndexingDone
+	return a.index.Search(ctx, query)
 }
 
-func (e *Editor) Close() {
-	for _, parser := range e.parsers {
+func (a *Analyzer) Close() {
+	for _, parser := range a.parsers {
 		parser.Close()
 	}
 }
