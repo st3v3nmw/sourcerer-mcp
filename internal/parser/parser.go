@@ -28,7 +28,7 @@ type ParserBase struct {
 func (p *ParserBase) executeQuery(rawQuery string, node *tree_sitter.Node, source []byte) []*tree_sitter.Node {
 	query, err := tree_sitter.NewQuery(p.parser.Language(), rawQuery)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("invalid tree-sitter query: %s\nquery: %s", err, rawQuery))
 	}
 
 	cursor := tree_sitter.NewQueryCursor()

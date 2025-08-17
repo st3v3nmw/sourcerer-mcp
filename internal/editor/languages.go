@@ -40,7 +40,6 @@ func (r *registry) detect(filePath string) Language {
 }
 
 func (r *registry) createParser(workspaceRoot string, lang Language) (parser.Parser, error) {
-
 	factory, exists := r.factories[lang]
 	if !exists {
 		return nil, fmt.Errorf("language %s not supported", lang)
