@@ -69,9 +69,9 @@ a single get_source_code call.
 This is better than making separate requests which waste tokens and time (round-trips).
 
 WHEN NOT TO USE:
-- Pattern searching (regex, exact text matches, etc)
-- When you need complete file content
+- Pattern searching e.g. finding occurrences of specific strings or identifiers
 - Exploring file/directory structure (use standard file operations)
+- When you need to read the full file
 - Reading configuration or data files
 `),
 	)

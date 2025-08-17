@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/st3v3nmw/sourcerer-mcp/internal/fs"
@@ -12,9 +13,10 @@ import (
 )
 
 type Editor struct {
-	workspaceRoot       string
-	parsers             map[Language]parser.Parser
-	files               map[string][]string // file path -> chunk paths
+	workspaceRoot string
+	parsers       map[Language]parser.Parser
+	files         map[string][]string // file path -> chunk paths
+
 	index               *index.Index
 	initialIndexingDone chan struct{}
 }
@@ -51,7 +53,7 @@ func New(ctx context.Context, workspaceRoot string) (*Editor, error) {
 }
 
 func (e *Editor) indexWorkspace(ctx context.Context) {
-	fs.WalkSourceFiles(e.workspaceRoot, func(filePath string) error {
+	fs.WalkSourceFiles(e.workspaceRoot, languages.supportedExts(), func(filePath string) error {
 		e.chunk(ctx, filePath)
 		return nil
 	})
@@ -60,27 +62,19 @@ func (e *Editor) indexWorkspace(ctx context.Context) {
 }
 
 func (e *Editor) getParser(filePath string) (parser.Parser, error) {
-	language := detectLanguage(filePath)
-	if language == UnknownLang {
-		return nil, fmt.Errorf("unsupported file %s", filePath)
+	lang := languages.detect(filepath.Ext(filePath))
+	parser, exists := e.parsers[lang]
+	if exists {
+		return parser, nil
 	}
 
-	var err error
-	parser, exists := e.parsers[language]
-	if !exists {
-		parser, err = newParserForLanguage(language, e.workspaceRoot)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return parser, nil
+	return languages.createParser(e.workspaceRoot, lang)
 }
 
-func (e *Editor) chunk(ctx context.Context, filePath string) {
+func (e *Editor) chunk(ctx context.Context, filePath string) error {
 	info, err := os.Stat(filePath)
 	if err != nil {
-		return
+		return err
 	}
 
 	if paths, exists := e.files[filePath]; exists {
@@ -95,23 +89,23 @@ func (e *Editor) chunk(ctx context.Context, filePath string) {
 		}
 
 		if allFresh {
-			return
+			return nil
 		}
 	}
 
-	parser, err := e.getParser(filePath) // TODO: handle error
+	parser, err := e.getParser(filePath)
 	if err != nil {
-		return
+		return err
 	}
 
-	file, err := parser.Chunk(filePath) // TODO: handle error
+	file, err := parser.Chunk(filePath)
 	if err != nil {
-		return
+		return err
 	}
 
-	err = e.index.Upsert(ctx, &file) // TODO: handle error
+	err = e.index.Upsert(ctx, &file)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	paths := make([]string, len(file.Chunks))
@@ -120,6 +114,8 @@ func (e *Editor) chunk(ctx context.Context, filePath string) {
 	}
 
 	e.files[filePath] = paths
+
+	return nil
 }
 
 func (e *Editor) getTOC(ctx context.Context, filePath string) string {
@@ -165,7 +161,10 @@ func (e *Editor) getChunkSource(ctx context.Context, id string) string {
 		return fmt.Sprintf("== %s ==\n\n<invalid chunk id>\n\n", id)
 	}
 
-	e.chunk(ctx, parts[0])
+	err := e.chunk(ctx, parts[0])
+	if err != nil {
+		return fmt.Sprintf("== %s ==\n\n<processing error: %v>\n\n", id, err)
+	}
 
 	chunk, err := e.index.GetChunk(ctx, id)
 	if err != nil {
