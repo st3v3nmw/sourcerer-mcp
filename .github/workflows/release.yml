@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'cmd/sourcerer/VERSION' ]
+
+jobs:
+  check-and-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Check if tag exists
+      id: tag_check
+      run: |
+        VERSION=$(cat cmd/sourcerer/VERSION | tr -d '\n\r')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+        if git tag -l | grep -q "^$VERSION$"; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Create and push tag
+      if: steps.tag_check.outputs.exists == 'false'
+      run: |
+        git config user.name "${{ github.actor }}"
+        git config user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+
+        git tag -a "${{ steps.tag_check.outputs.version }}" -m "Release ${{ steps.tag_check.outputs.version }}"
+        git push origin "${{ steps.tag_check.outputs.version }}"
+
+    - name: Create GitHub Release
+      if: steps.tag_check.outputs.exists == 'false'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag_check.outputs.version }}
+        release_name: Release ${{ steps.tag_check.outputs.version }}
+        draft: false
+        prerelease: false

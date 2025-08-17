@@ -16,7 +16,7 @@ type Server struct {
 	analyzer      *analyzer.Analyzer
 }
 
-func NewServer(workspaceRoot string) (*Server, error) {
+func NewServer(workspaceRoot, version string) (*Server, error) {
 	a, err := analyzer.New(context.Background(), workspaceRoot)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func NewServer(workspaceRoot string) (*Server, error) {
 
 	s.mcp = server.NewMCPServer(
 		"Sourcerer",
-		"1.0.0",
+		version,
 		server.WithInstructions(`
 You have access to Sourcerer MCP tools for efficient codebase navigation.
 Sourcerer provides surgical precision - you can jump directly to specific functions,
@@ -51,9 +51,19 @@ Effective approaches:
 - Include context about what the code should accomplish
 - Mention related functionality or typical patterns
 
-AVOID REDUNDANT SEARCHES: If you already know the specific function/class/method/struct/etc
-and file location from previous context, construct the chunk ID yourself
-and use get_source_code directly rather than wastefully searching again.
+AVOID SEMANTIC SEARCH FOR STRUCTURAL QUERIES:
+Before using semantic search, ask: "Am I looking for a specific named thing?"
+If yes, use pattern-based tools instead:
+
+DON'T semantic search for:
+- "function definition of X" → use grep with function patterns
+- "interface implementation" → use grep for "type.*interface"
+- "struct definition" → use glob for "*.go" & grep for "type.*struct"
+- "method calls to X" → use grep for "X(" patterns
+
+Semantic search is for CONCEPTS and RELATIONSHIPS, not NAMES and STRUCTURES.
+Use it for "authentication logic" or "error handling patterns",
+not "Parser interface" or "ExtractReferences function".
 
 CHUNK IDs:
 Chunks use stable addressing: path/to/file.ext::TypeName::methodName
@@ -66,16 +76,14 @@ Chunk IDs are stable across minor edits but update when code structure changes
 (renames, moves, deletions). Use get_source_code with these precise ids to get
 exactly the code you need.
 
+If you already know the specific function/class/method/struct/etc
+and file location from previous context, construct the chunk ID yourself
+and use get_source_code directly rather than semantic searching again.
+
 BATCHING:
 When you need multiple related chunks, collect the chunk ids first then batch them in
 a single get_source_code call.
 This is better than making separate requests which waste tokens and time (round-trips).
-
-WHEN NOT TO USE:
-- Pattern searching (use existing pattern matching & grep tools)
-- Exploring directory structure & project layout (use existing tools)
-- When you need to read the full file
-- Reading configuration or data files
 `),
 	)
 

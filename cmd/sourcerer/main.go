@@ -4,8 +4,13 @@ import (
 	"log"
 	"os"
 
+	_ "embed"
+
 	"github.com/st3v3nmw/sourcerer-mcp/internal/mcp"
 )
+
+//go:embed VERSION
+var Version string
 
 func main() {
 	workspaceRoot := os.Getenv("SOURCERER_WORKSPACE_ROOT")
@@ -13,7 +18,7 @@ func main() {
 		workspaceRoot = "."
 	}
 
-	server, err := mcp.NewServer(workspaceRoot)
+	server, err := mcp.NewServer(workspaceRoot, Version)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
