@@ -51,6 +51,10 @@ Effective approaches:
 - Include context about what the code should accomplish
 - Mention related functionality or typical patterns
 
+If you already know the specific function/class/method/struct/etc name and file location
+from previous context, construct the chunk ID directly (e.g. file.ext::ClassName::methodName)
+and use get_source_code rather than wastefully searching again.
+
 CHUNK IDs:
 Chunks use stable addressing: path/to/file.ext::ClassName::methodName
 - Classes: src/auth.js::AuthService

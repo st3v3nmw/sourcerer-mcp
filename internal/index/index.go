@@ -97,6 +97,7 @@ func (idx *Index) GetChunk(ctx context.Context, id string) (*parser.Chunk, error
 	parsedAt, _ := strconv.ParseInt(doc.Metadata["parsedAt"], 10, 64)
 
 	return &parser.Chunk{
+		File:        doc.Metadata["file"],
 		Path:        doc.Metadata["path"],
 		Summary:     doc.Metadata["summary"],
 		Source:      doc.Content,
