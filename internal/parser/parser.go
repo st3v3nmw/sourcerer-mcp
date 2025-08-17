@@ -87,11 +87,10 @@ func summarize(source string) string {
 }
 
 type LanguageSpec struct {
-	ChunkExtractors map[string]ChunkExtractor
-	RefQueries      map[string]string
+	NamedChunks map[string]NamedChunkExtractor
 }
 
-type ChunkExtractor struct {
+type NamedChunkExtractor struct {
 	NameQuery          string
 	ParentNameQuery    string
 	ParentNameInParent bool
@@ -148,7 +147,7 @@ func (p *ParserBase) extractChunks(node *tree_sitter.Node, source []byte) []*Chu
 	usedPaths := map[string]bool{}
 	for i := uint(0); i < node.ChildCount(); i++ {
 		child := node.Child(i)
-		extractor, exists := p.spec.ChunkExtractors[child.Kind()]
+		extractor, exists := p.spec.NamedChunks[child.Kind()]
 		if exists {
 			name := p.buildChunkName(extractor, child, node, source)
 			chunk := newChunk(child, source, name, usedPaths)
@@ -167,7 +166,7 @@ func (p *ParserBase) extractNode(node *tree_sitter.Node, source []byte, usedPath
 	return newChunk(node, source, hash, usedPaths)
 }
 
-func (p *ParserBase) buildChunkName(extractor ChunkExtractor, child, parent *tree_sitter.Node, source []byte) string {
+func (p *ParserBase) buildChunkName(extractor NamedChunkExtractor, child, parent *tree_sitter.Node, source []byte) string {
 	name := p.getTextWithQuery(extractor.NameQuery, child, source)
 
 	if extractor.ParentNameQuery != "" {

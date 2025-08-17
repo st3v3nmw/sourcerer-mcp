@@ -6,7 +6,7 @@ import (
 )
 
 var GoSpec = &LanguageSpec{
-	ChunkExtractors: map[string]ChunkExtractor{
+	NamedChunks: map[string]NamedChunkExtractor{
 		"function_declaration": {
 			NameQuery: `(function_declaration name: (identifier) @name)`,
 		},
@@ -24,11 +24,6 @@ var GoSpec = &LanguageSpec{
 		"type_declaration": {
 			NameQuery: `(type_declaration (type_spec name: (type_identifier) @name))`,
 		},
-	},
-	RefQueries: map[string]string{
-		"function_calls": `(call_expression function: (identifier) @call)`,
-		"method_calls":   `(call_expression function: (selector_expression field: (field_identifier) @method))`,
-		"imports":        `(import_spec path: (interpreted_string_literal) @import)`,
 	},
 }
 
