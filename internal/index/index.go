@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"runtime"
 	"sort"
 	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/philippgille/chromem-go"
 	"github.com/st3v3nmw/sourcerer-mcp/internal/parser"
@@ -21,32 +22,83 @@ const (
 type Index struct {
 	workspaceRoot string
 	collection    *chromem.Collection
+
+	fileMetadata map[string]int64
+	metadataMu   sync.RWMutex
 }
 
-func New(workspaceRoot string) (*Index, error) {
+func New(ctx context.Context, workspaceRoot string) (*Index, error) {
 	db, err := chromem.NewPersistentDB(".sourcerer/db", false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vector db: %w", err)
 	}
 
-	collection, err := db.GetOrCreateCollection("code", nil, nil)
+	collection, err := db.GetOrCreateCollection("code-chunks", nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vector db collection: %w", err)
 	}
 
-	return &Index{
+	idx := &Index{
 		workspaceRoot: workspaceRoot,
 		collection:    collection,
-	}, nil
+		fileMetadata:  map[string]int64{},
+	}
+
+	idx.loadFileMetadata(ctx)
+
+	return idx, nil
 }
 
-func (idx *Index) Upsert(ctx context.Context, file *parser.File) error {
+func (idx *Index) loadFileMetadata(ctx context.Context) {
+	chunkIDs := idx.collection.ListIDs(ctx)
+	for _, chunkID := range chunkIDs {
+		parts := strings.SplitN(chunkID, "::", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		filePath := parts[0]
+		_, exists := idx.fileMetadata[filePath]
+		if !exists {
+			chunk, err := idx.GetChunk(ctx, chunkID)
+			if err != nil {
+				continue
+			}
+
+			idx.fileMetadata[filePath] = chunk.ParsedAt
+		}
+	}
+}
+
+func (idx *Index) ShouldIndex(filePath string) bool {
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return false
+	}
+
+	idx.metadataMu.RLock()
+	defer idx.metadataMu.RUnlock()
+
+	parsedAt, exists := idx.fileMetadata[filePath]
+	if !exists {
+		return true
+	}
+
+	return fileInfo.ModTime().UnixMicro() > parsedAt
+}
+
+func (idx *Index) Index(ctx context.Context, file *parser.File) error {
 	err := idx.Remove(ctx, file.Path)
 	if err != nil {
 		return err
 	}
 
+	if len(file.Chunks) == 0 {
+		return nil
+	}
+
 	docs := []chromem.Document{}
+	chunkIDs := []string{}
 	for _, chunk := range file.Chunks {
 		doc := chromem.Document{
 			ID: chunk.ID(),
@@ -64,12 +116,18 @@ func (idx *Index) Upsert(ctx context.Context, file *parser.File) error {
 		}
 
 		docs = append(docs, doc)
+		chunkIDs = append(chunkIDs, chunk.ID())
 	}
 
 	err = idx.collection.AddDocuments(ctx, docs, runtime.NumCPU())
 	if err != nil {
 		return fmt.Errorf("failed to add documents to vector db: %w", err)
 	}
+
+	idx.metadataMu.Lock()
+	defer idx.metadataMu.Unlock()
+
+	idx.fileMetadata[file.Path] = file.Chunks[0].ParsedAt
 
 	return nil
 }
@@ -81,7 +139,49 @@ func (idx *Index) Remove(ctx context.Context, filePath string) error {
 		return fmt.Errorf("failed to remove documents from vector db: %w", err)
 	}
 
+	idx.metadataMu.Lock()
+	defer idx.metadataMu.Unlock()
+
+	delete(idx.fileMetadata, filePath)
+
 	return nil
+}
+
+func (idx *Index) Search(ctx context.Context, query string) ([]string, error) {
+	results, err := idx.collection.Query(ctx, query, 2*maxResults, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform similarity search: %w", err)
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Similarity > results[j].Similarity
+	})
+
+	paths := []string{}
+	for i, result := range results {
+		if result.Similarity < minSimilarity || i >= maxResults {
+			break
+		}
+
+		chunk, err := idx.GetChunk(ctx, result.ID)
+		if err != nil {
+			continue
+		}
+
+		var lines string
+		if chunk.StartLine == chunk.EndLine {
+			lines = fmt.Sprintf("line %d", chunk.StartLine)
+		} else {
+			lines = fmt.Sprintf("lines %d-%d", chunk.StartLine, chunk.EndLine)
+		}
+
+		paths = append(
+			paths,
+			fmt.Sprintf("%s | %s [%s]", result.ID, chunk.Summary, lines),
+		)
+	}
+
+	return paths, nil
 }
 
 func (idx *Index) GetChunk(ctx context.Context, id string) (*parser.Chunk, error) {
@@ -107,97 +207,4 @@ func (idx *Index) GetChunk(ctx context.Context, id string) (*parser.Chunk, error
 		EndColumn:   uint(endColumn),
 		ParsedAt:    parsedAt,
 	}, nil
-}
-
-func (idx *Index) isChunkStale(chunk *parser.Chunk) bool {
-	fullPath := path.Join(idx.workspaceRoot, chunk.File)
-
-	info, err := os.Stat(fullPath)
-	if err != nil {
-		return true
-	}
-
-	return info.ModTime().UnixMicro() > chunk.ParsedAt
-}
-
-func (idx *Index) IsChunkStale(ctx context.Context, id string) (bool, error) {
-	chunk, err := idx.GetChunk(ctx, id)
-	if err != nil {
-		return true, nil
-	}
-
-	return idx.isChunkStale(chunk), nil
-}
-
-func (idx *Index) GetAllChunkIDs(ctx context.Context) map[string][]string {
-	ids := idx.collection.ListIDs(ctx)
-
-	result := make(map[string][]string)
-	staleChunkIDs := []string{}
-	for _, id := range ids {
-		chunk, err := idx.GetChunk(ctx, id)
-		if err != nil {
-			continue
-		}
-
-		if idx.isChunkStale(chunk) {
-			staleChunkIDs = append(staleChunkIDs, chunk.ID())
-			continue
-		}
-
-		result[chunk.File] = append(result[chunk.File], id)
-	}
-
-	if len(staleChunkIDs) > 0 {
-		go idx.collection.Delete(ctx, nil, nil, staleChunkIDs...)
-	}
-
-	return result
-}
-
-func (idx *Index) Search(ctx context.Context, query string) ([]string, error) {
-	results, err := idx.collection.Query(ctx, query, 2*maxResults, nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to perform similarity search: %w", err)
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Similarity > results[j].Similarity
-	})
-
-	paths := []string{}
-	staleChunkIDs := []string{}
-	for i, result := range results {
-		if result.Similarity < minSimilarity || i >= maxResults {
-			break
-		}
-
-		chunk, err := idx.GetChunk(ctx, result.ID)
-		if err != nil {
-			continue
-		}
-
-		if idx.isChunkStale(chunk) {
-			staleChunkIDs = append(staleChunkIDs, result.ID)
-			continue
-		}
-
-		var lines string
-		if chunk.StartLine == chunk.EndLine {
-			lines = fmt.Sprintf("line %d", chunk.StartLine)
-		} else {
-			lines = fmt.Sprintf("lines %d-%d", chunk.StartLine, chunk.EndLine)
-		}
-
-		paths = append(
-			paths,
-			fmt.Sprintf("%s | %s [%s]", result.ID, chunk.Summary, lines),
-		)
-	}
-
-	if len(staleChunkIDs) > 0 {
-		go idx.collection.Delete(ctx, nil, nil, staleChunkIDs...)
-	}
-
-	return paths, nil
 }

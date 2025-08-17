@@ -56,8 +56,8 @@ func (r *registry) register(lang Language, extensions []string, factory ParserFa
 }
 
 var languages = &registry{
-	extensions: make(map[string]Language),
-	factories:  make(map[Language]ParserFactory),
+	extensions: map[string]Language{},
+	factories:  map[Language]ParserFactory{},
 }
 
 func init() {
