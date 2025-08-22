@@ -15,7 +15,7 @@ import (
 
 type Analyzer struct {
 	workspaceRoot string
-	parsers       map[Language]parser.Parser
+	parsers       map[Language]*parser.Parser
 	watcher       *fs.Watcher
 
 	index         *index.Index
@@ -32,7 +32,7 @@ func New(ctx context.Context, workspaceRoot string) (*Analyzer, error) {
 
 	analyzer := &Analyzer{
 		workspaceRoot: workspaceRoot,
-		parsers:       map[Language]parser.Parser{},
+		parsers:       map[Language]*parser.Parser{},
 		index:         index,
 	}
 
@@ -90,7 +90,7 @@ func (a *Analyzer) processFiles(ctx context.Context, filePaths []string) {
 	a.indexMu.Unlock()
 }
 
-func (a *Analyzer) getParser(filePath string) (parser.Parser, error) {
+func (a *Analyzer) getParser(filePath string) (*parser.Parser, error) {
 	lang := languages.detect(filepath.Ext(filePath))
 	parser, exists := a.parsers[lang]
 	if exists {
@@ -119,9 +119,14 @@ func (a *Analyzer) chunk(ctx context.Context, filePath string) error {
 	return nil
 }
 
-func (a *Analyzer) SemanticSearch(ctx context.Context, query string) ([]string, error) {
+func (a *Analyzer) SemanticSearch(ctx context.Context, query string, fileTypes []string) ([]string, error) {
 	a.flushPendingChanges()
-	return a.index.Search(ctx, query)
+	return a.index.Search(ctx, query, fileTypes)
+}
+
+func (a *Analyzer) FindSimilarChunks(ctx context.Context, chunkID string) ([]string, error) {
+	a.flushPendingChanges()
+	return a.index.FindSimilarChunks(ctx, chunkID)
 }
 
 func (a *Analyzer) flushPendingChanges() {
@@ -130,16 +135,16 @@ func (a *Analyzer) flushPendingChanges() {
 	}
 }
 
-func (a *Analyzer) GetChunkSources(ctx context.Context, ids []string) string {
-	chunks := ""
+func (a *Analyzer) GetChunkCode(ctx context.Context, ids []string) string {
+	result := ""
 	for _, id := range ids {
-		chunks += a.getChunkSource(ctx, id)
+		result += a.getSingleChunkCode(ctx, id)
 	}
 
-	return chunks
+	return result
 }
 
-func (a *Analyzer) getChunkSource(ctx context.Context, id string) string {
+func (a *Analyzer) getSingleChunkCode(ctx context.Context, id string) string {
 	parts := strings.SplitN(id, "::", 2)
 	if len(parts) != 2 {
 		return fmt.Sprintf("== %s ==\n\n<invalid chunk id>\n\n", id)

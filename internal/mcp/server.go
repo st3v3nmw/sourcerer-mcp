@@ -33,59 +33,55 @@ func NewServer(workspaceRoot, version string) (*Server, error) {
 		version,
 		server.WithInstructions(`
 You have access to Sourcerer MCP tools for efficient codebase navigation.
-Sourcerer provides surgical precision - you can jump directly to specific functions,
-classes, and code chunks without reading entire files, reducing token waste & cognitive load.
+Sourcerer provides surgical precision - you can jump directly to specific
+functions, classes, and code chunks without reading entire files.
+This reduces token waste & cognitive load.
 
 SEARCH STRATEGY:
-Sourcerer's semantic search understands concepts and relationships.
-Describe what you're looking for conceptually and functionally:
-
-Good queries:
-- "user authentication and session management logic"
-- "database operations and data persistence"
-- "HTTP request routing and API endpoints"
-- "configuration loading and environment setup"
-
-Effective approaches:
+Sourcerer's semantic search understands concepts and relationships:
 - Describe the purpose/behavior you're seeking
 - Use natural language to explain the concept
 - Include context about what the code should accomplish
 - Mention related functionality or typical patterns
 
-AVOID SEMANTIC SEARCH FOR STRUCTURAL QUERIES:
-Before using semantic search, ask: "Am I looking for a specific named thing?"
-If yes, use pattern-based tools instead:
+The line numbers shown in search results (e.g., "lines 45-67") reference the
+exact location in the original file and can be used with standard file tools
+if you need to read or edit those specific sections.
 
-DON'T semantic search for:
-- "function definition of X" → use grep with function patterns
-- "interface implementation" → use grep for "type.*interface"
-- "struct definition" → use glob for "*.go" & grep for "type.*struct"
-- "method calls to X" → use grep for "X(" patterns
+Use the file_types param to filter search results (defaults to ['src', 'docs']):
+- src: Source code
+- docs: Documentation
+- tests: Tests code
 
-Semantic search is for CONCEPTS and RELATIONSHIPS, not NAMES and STRUCTURES.
-Use it for "authentication logic" or "error handling patterns",
-not "Parser interface" or "ExtractReferences function".
+AVOID SEMANTIC SEARCH FOR EXACT MATCHES:
+If you need to find specific names or exact text, use pattern-based tools
+like grep & glob instead:
 
-CHUNK IDs:
-Apart from summaries & line numbers, search returns chunk IDs
-like: path/to/file.ext::TypeName::methodName, e.g.
-- Classes: src/auth.js::AuthService
-- Methods: src/auth.js::AuthService::login
-- Top-level: src/utils.js::validateEmail
-- Unnamed chunks, like imports: src/utils.js::af81a7ff
+Good: "authentication logic and session management"
+Avoid: "AuthService class definition" (use grep instead)
 
-Chunk IDs are stable across minor edits but update when code structure changes
-(renames, moves, deletions). Use get_source_code with these precise ids to get
-exactly the code you need.
+CHUNK IDs
+Use chunk IDs to retrieve source code:
+- Type definition: path/to/file.ext::Type
+- Specific method in Type: path/to/file.ext::Type::method
+- Variable: path/to/file.ext::Var
+- Content-based chunks: file.ext::695fffd41945e08d (imports, markdown, etc)
 
-If you already know the specific function/class/method/struct/etc
-and file location from previous context, construct the chunk ID yourself
-and use get_source_code directly rather than semantic searching again.
+Chunk IDs are stable across minor edits but update when code structure
+changes (renames, moves, deletions). Use get_chunk_code with these precise
+ids to get exactly the code you need.
+
+If you already know the specific function/class/method/struct/etc and file
+location from previous context, construct the chunk ID yourself and use
+get_chunk_code directly rather than semantic searching again.
 
 BATCHING:
-When you need multiple related chunks, collect the chunk ids first then batch them in
-a single get_source_code call.
-This is better than making separate requests which waste tokens and time (round-trips).
+Batch operations instead of making separate requests which waste tokens and
+time (round-trips).
+
+DO NOT try pulling all chunks within a specific file (with an id like file.ext).
+That defeats the purpose of surgical precision. If you need the entire file,
+just read it directly with your standard tools.
 `),
 	)
 
@@ -96,29 +92,41 @@ This is better than making separate requests which waste tokens and time (round-
 				mcp.Required(),
 				mcp.Description("Your search"),
 			),
+			mcp.WithArray("file_types",
+				mcp.WithStringItems(),
+				mcp.Description("Filter by file type(s)"),
+			),
 		),
 		s.semanticSearch,
 	)
 
 	s.mcp.AddTool(
-		mcp.NewTool("get_source_code",
-			mcp.WithDescription("Get the actual code you need to examine/modify"),
+		mcp.NewTool("find_similar_chunks",
+			mcp.WithDescription("Find code chunks semantically similar to a given chunk"),
+			mcp.WithString("id",
+				mcp.Required(),
+				mcp.Description("The chunk ID to find similar code for"),
+			),
+		),
+		s.findSimilarChunks,
+	)
+
+	s.mcp.AddTool(
+		mcp.NewTool("get_chunk_code",
+			mcp.WithDescription("Get the actual code you need to examine"),
 			mcp.WithArray("ids",
 				mcp.WithStringItems(),
 				mcp.MinItems(1),
 				mcp.Required(),
-				mcp.Description(`
-					FULL chunk IDs to get source code for e.g.
-					['pkg/fs/files.go::File::IsDir', 'src/auth/login.js::generateJWT', 'src/utils.js::af81a7ff']
-				`),
+				mcp.Description("Chunks to get code for"),
 			),
 		),
-		s.getSourceCode,
+		s.getChunkCode,
 	)
 
 	s.mcp.AddTool(
 		mcp.NewTool("index_workspace",
-			mcp.WithDescription("Index or re-index the entire workspace"),
+			mcp.WithDescription("Index all pending files in the workspace"),
 		),
 		s.indexWorkspace,
 	)
@@ -139,8 +147,9 @@ func (s *Server) Serve() error {
 
 func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	query := request.GetString("query", "")
+	fileTypes := request.GetStringSlice("file_types", []string{"src", "docs"})
 
-	results, err := s.analyzer.SemanticSearch(ctx, query)
+	results, err := s.analyzer.SemanticSearch(ctx, query, fileTypes)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Search failed: %v", err)), nil
 	}
@@ -153,14 +162,33 @@ func (s *Server) semanticSearch(ctx context.Context, request mcp.CallToolRequest
 	return mcp.NewToolResultText(content), nil
 }
 
-func (s *Server) getSourceCode(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (s *Server) findSimilarChunks(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	chunkID := request.GetString("id", "")
+
+	results, err := s.analyzer.FindSimilarChunks(ctx, chunkID)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Search failed: %v", err)), nil
+	}
+
+	if len(results) == 0 {
+		return mcp.NewToolResultText("No similar chunks found."), nil
+	}
+
+	content := strings.Join(results, "\n")
+	return mcp.NewToolResultText(content), nil
+}
+
+func (s *Server) getChunkCode(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	ids := request.GetStringSlice("ids", []string{})
-	chunks := s.analyzer.GetChunkSources(ctx, ids)
+
+	chunks := s.analyzer.GetChunkCode(ctx, ids)
+
 	return mcp.NewToolResultText(chunks), nil
 }
 
 func (s *Server) indexWorkspace(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	go s.analyzer.IndexWorkspace(ctx)
+
 	return mcp.NewToolResultText("Indexing in progress..."), nil
 }
 

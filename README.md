@@ -62,7 +62,7 @@ Sourcerer builds a semantic search index of your codebase:
 - Uses [Tree-sitter](https://tree-sitter.github.io/tree-sitter/) to parse source files into ASTs
 - Extracts meaningful chunks (functions, classes, methods, types) with stable IDs
 - Each chunk includes source code, location info, and contextual summaries
-- Chunk IDs follow the pattern: `file.ext::TypeName::methodName`
+- Chunk IDs follow the format: `file.ext::Type::method`
 
 ### 2. File System Integration
 
@@ -80,8 +80,9 @@ Sourcerer builds a semantic search index of your codebase:
 
 ### 4. MCP Tools
 
-- `semantic_search`: Find code by concept/functionality
-- `get_source_code`: Retrieve specific chunks by ID
+- `semantic_search`: Find relevant code using semantic search
+- `get_chunk_code`: Retrieve specific chunks by ID
+- `find_similar_chunks`: Find similar chunks
 - `index_workspace`: Manually trigger re-indexing
 - `get_index_status`: Check indexing progress
 
@@ -93,7 +94,7 @@ dramatically reducing token usage and cognitive load.
 Language support requires writing [Tree-sitter queries](https://github.com/st3v3nmw/sourcerer-mcp/blob/main/internal/parser/go.go)
 to identify functions, classes, interfaces, and other code structures for each language.
 
-**Supported:** Go
+**Supported:** Go, Markdown
 
 **Planned:** Python, TypeScript, JavaScript
 

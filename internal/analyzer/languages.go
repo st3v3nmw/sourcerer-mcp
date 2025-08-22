@@ -11,10 +11,11 @@ type Language string
 
 const (
 	Go          Language = "go"
+	Markdown    Language = "markdown"
 	UnknownLang Language = "unknown"
 )
 
-type ParserFactory func(workspaceRoot string) (parser.Parser, error)
+type ParserFactory func(workspaceRoot string) (*parser.Parser, error)
 
 type registry struct {
 	extensions map[string]Language
@@ -39,7 +40,7 @@ func (r *registry) detect(filePath string) Language {
 	return lang
 }
 
-func (r *registry) createParser(workspaceRoot string, lang Language) (parser.Parser, error) {
+func (r *registry) createParser(workspaceRoot string, lang Language) (*parser.Parser, error) {
 	factory, exists := r.factories[lang]
 	if !exists {
 		return nil, fmt.Errorf("language %s not supported", lang)
@@ -64,8 +65,15 @@ func init() {
 	languages.register(
 		Go,
 		[]string{".go"},
-		func(workspaceRoot string) (parser.Parser, error) {
+		func(workspaceRoot string) (*parser.Parser, error) {
 			return parser.NewGoParser(workspaceRoot)
 		},
 	)
+
+	languages.register(
+		Markdown,
+		[]string{".md", ".markdown"},
+		func(workspaceRoot string) (*parser.Parser, error) {
+			return parser.NewMarkdownParser(workspaceRoot)
+		})
 }

@@ -19,12 +19,18 @@ const (
 	maxResults    = 30
 )
 
+type ChunkMetadata struct {
+	Type     string // chunk type (src, docs, etc)
+	Path     string // hierarchical path: Class::method
+	ParsedAt int64  // when chunk was parsed
+}
+
 type Index struct {
 	workspaceRoot string
 	collection    *chromem.Collection
 
-	fileMetadata map[string]int64
-	metadataMu   sync.RWMutex
+	cache   map[string][]*ChunkMetadata
+	cacheMu sync.RWMutex
 }
 
 func New(ctx context.Context, workspaceRoot string) (*Index, error) {
@@ -41,16 +47,19 @@ func New(ctx context.Context, workspaceRoot string) (*Index, error) {
 	idx := &Index{
 		workspaceRoot: workspaceRoot,
 		collection:    collection,
-		fileMetadata:  map[string]int64{},
+		cache:         map[string][]*ChunkMetadata{},
 	}
 
-	idx.loadFileMetadata(ctx)
+	idx.loadCache(ctx)
 
 	return idx, nil
 }
 
-func (idx *Index) loadFileMetadata(ctx context.Context) {
-	seen := map[string]bool{}
+func (idx *Index) loadCache(ctx context.Context) {
+	idx.cacheMu.Lock()
+	defer idx.cacheMu.Unlock()
+
+	fileChunks := map[string][]*ChunkMetadata{}
 	chunkIDs := idx.collection.ListIDs(ctx)
 	for _, chunkID := range chunkIDs {
 		parts := strings.SplitN(chunkID, "::", 2)
@@ -59,41 +68,53 @@ func (idx *Index) loadFileMetadata(ctx context.Context) {
 		}
 
 		filePath := parts[0]
-		_, exists := idx.fileMetadata[filePath]
-		if !exists && !seen[filePath] {
-			chunk, err := idx.GetChunk(ctx, chunkID)
-			if err != nil {
-				continue
-			}
 
-			seen[filePath] = true
-			if !idx.IsStale(filePath) {
-				where := map[string]string{"file": filePath}
-				idx.collection.Delete(ctx, where, nil)
-				continue
-			}
-
-			idx.fileMetadata[filePath] = chunk.ParsedAt
+		// Check if file still exists
+		_, err := os.Stat(filePath)
+		if err != nil {
+			where := map[string]string{"file": filePath}
+			idx.collection.Delete(ctx, where, nil)
+			continue
 		}
+
+		chunk, err := idx.GetChunk(ctx, chunkID)
+		if err != nil {
+			continue
+		}
+
+		fileChunks[filePath] = append(fileChunks[filePath], &ChunkMetadata{
+			Type:     chunk.Type,
+			Path:     chunk.Path,
+			ParsedAt: chunk.ParsedAt,
+		})
 	}
 
+	idx.cache = fileChunks
 }
 
 func (idx *Index) IsStale(filePath string) bool {
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
-		return false
-	}
-
-	idx.metadataMu.RLock()
-	defer idx.metadataMu.RUnlock()
-
-	parsedAt, exists := idx.fileMetadata[filePath]
-	if !exists {
 		return true
 	}
 
-	return fileInfo.ModTime().UnixMicro() > parsedAt
+	idx.cacheMu.RLock()
+	defer idx.cacheMu.RUnlock()
+
+	chunks, exists := idx.cache[filePath]
+	if !exists || len(chunks) == 0 {
+		return true
+	}
+
+	// Find the maximum parsedAt timestamp among all chunks
+	var maxParsedAt int64
+	for _, chunk := range chunks {
+		if chunk.ParsedAt > maxParsedAt {
+			maxParsedAt = chunk.ParsedAt
+		}
+	}
+
+	return fileInfo.ModTime().Unix() > maxParsedAt
 }
 
 func (idx *Index) Index(ctx context.Context, file *parser.File) error {
@@ -112,6 +133,7 @@ func (idx *Index) Index(ctx context.Context, file *parser.File) error {
 			ID: chunk.ID(),
 			Metadata: map[string]string{
 				"file":        file.Path,
+				"type":        chunk.Type,
 				"path":        chunk.Path,
 				"summary":     chunk.Summary,
 				"startLine":   strconv.Itoa(int(chunk.StartLine)),
@@ -131,9 +153,18 @@ func (idx *Index) Index(ctx context.Context, file *parser.File) error {
 		return fmt.Errorf("failed to add documents to vector db: %w", err)
 	}
 
-	idx.metadataMu.Lock()
-	idx.fileMetadata[file.Path] = file.Chunks[0].ParsedAt
-	idx.metadataMu.Unlock()
+	idx.cacheMu.Lock()
+	defer idx.cacheMu.Unlock()
+
+	chunkMetadata := make([]*ChunkMetadata, 0, len(file.Chunks))
+	for _, chunk := range file.Chunks {
+		chunkMetadata = append(chunkMetadata, &ChunkMetadata{
+			Type:     chunk.Type,
+			Path:     chunk.Path,
+			ParsedAt: chunk.ParsedAt,
+		})
+	}
+	idx.cache[file.Path] = chunkMetadata
 
 	return nil
 }
@@ -145,32 +176,75 @@ func (idx *Index) Remove(ctx context.Context, filePath string) error {
 		return fmt.Errorf("failed to remove documents from vector db: %w", err)
 	}
 
-	idx.metadataMu.Lock()
-	defer idx.metadataMu.Unlock()
+	idx.cacheMu.Lock()
+	defer idx.cacheMu.Unlock()
 
-	delete(idx.fileMetadata, filePath)
+	delete(idx.cache, filePath)
 
 	return nil
 }
 
-func (idx *Index) Search(ctx context.Context, query string) ([]string, error) {
-	results, err := idx.collection.Query(ctx, query, 2*maxResults, nil, nil)
+func (idx *Index) Search(ctx context.Context, query string, fileTypes []string) ([]string, error) {
+	if len(fileTypes) == 0 {
+		fileTypes = []string{"src", "docs"}
+	}
+
+	// chromem-go doesn't support OR filtering, for now fetch more & filter manually
+	results, err := idx.collection.Query(ctx, query, len(fileTypes)*maxResults, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform similarity search: %w", err)
 	}
 
+	allowedTypes := make(map[string]bool)
+	for _, ft := range fileTypes {
+		allowedTypes[ft] = true
+	}
+
+	return idx.formatSearchResults(ctx, results, minSimilarity, maxResults, "", allowedTypes), nil
+}
+
+func (idx *Index) FindSimilarChunks(ctx context.Context, chunkID string) ([]string, error) {
+	doc, err := idx.collection.GetByID(ctx, chunkID)
+	if err != nil {
+		return nil, fmt.Errorf("chunk not found: %s", chunkID)
+	}
+
+	results, err := idx.collection.QueryEmbedding(ctx, doc.Embedding, 10, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to perform similarity search: %w", err)
+	}
+
+	return idx.formatSearchResults(ctx, results, 2*minSimilarity, 10, chunkID, nil), nil
+}
+
+func (idx *Index) formatSearchResults(
+	ctx context.Context,
+	results []chromem.Result,
+	minSimilarity float32,
+	maxCount int,
+	skipID string,
+	typeFilter map[string]bool,
+) []string {
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Similarity > results[j].Similarity
 	})
 
 	paths := []string{}
-	for i, result := range results {
-		if result.Similarity < minSimilarity || i >= maxResults {
+	for _, result := range results {
+		if result.ID == skipID {
+			continue
+		}
+
+		if result.Similarity < minSimilarity || len(paths) >= maxCount {
 			break
 		}
 
 		chunk, err := idx.GetChunk(ctx, result.ID)
 		if err != nil {
+			continue
+		}
+
+		if typeFilter != nil && !typeFilter[chunk.Type] {
 			continue
 		}
 
@@ -187,7 +261,7 @@ func (idx *Index) Search(ctx context.Context, query string) ([]string, error) {
 		)
 	}
 
-	return paths, nil
+	return paths
 }
 
 func (idx *Index) GetChunk(ctx context.Context, id string) (*parser.Chunk, error) {
@@ -204,6 +278,7 @@ func (idx *Index) GetChunk(ctx context.Context, id string) (*parser.Chunk, error
 
 	return &parser.Chunk{
 		File:        doc.Metadata["file"],
+		Type:        doc.Metadata["type"],
 		Path:        doc.Metadata["path"],
 		Summary:     doc.Metadata["summary"],
 		Source:      doc.Content,

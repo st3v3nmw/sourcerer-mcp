@@ -13,33 +13,49 @@ var GoSpec = &LanguageSpec{
 		"method_declaration": {
 			NameQuery: `(method_declaration name: (field_identifier) @name)`,
 			ParentNameQuery: `
-			  (method_declaration
-			    receiver: (parameter_list
-			      (parameter_declaration
-			        type: [(type_identifier) @receiver_type
-			               (pointer_type
-			                 (type_identifier) @receiver_type)])))`,
-			ParentNameInParent: false,
+				(method_declaration
+					receiver: (parameter_list
+						(parameter_declaration
+							type: [
+								(type_identifier) @name
+								(pointer_type
+									(type_identifier) @name)
+								(generic_type
+									(type_identifier) @name)
+								(pointer_type
+									(generic_type
+										(type_identifier) @name))])))`,
 		},
 		"type_declaration": {
-			NameQuery: `(type_declaration (type_spec name: (type_identifier) @name))`,
+			NameQuery: `
+				(type_declaration [
+					(type_spec name: (type_identifier) @name)
+					(type_alias name: (type_identifier) @name)])`,
 		},
+		"var_declaration": {
+			NameQuery: `(var_declaration (var_spec name: (identifier) @name))`,
+		},
+		"const_declaration": {
+			NameQuery: `(const_declaration (const_spec name: (identifier) @name))`,
+		},
+	},
+	Ignore: []string{
+		"package_clause", // pollutes results with single-line matches
+	},
+	FileTypeRules: []FileTypeRule{
+		{Pattern: "**/*_test.go", Type: FileTypeTests},
+		{Pattern: "vendor/**", Type: FileTypeIgnore},
+		{Pattern: "third_party/**", Type: FileTypeIgnore},
 	},
 }
 
-type GoParser struct {
-	ParserBase
-}
-
-func NewGoParser(workspaceRoot string) (*GoParser, error) {
+func NewGoParser(workspaceRoot string) (*Parser, error) {
 	parser := tree_sitter.NewParser()
 	parser.SetLanguage(tree_sitter.NewLanguage(tree_sitter_go.Language()))
 
-	return &GoParser{
-		ParserBase: ParserBase{
-			workspaceRoot: workspaceRoot,
-			parser:        parser,
-			spec:          GoSpec,
-		},
+	return &Parser{
+		workspaceRoot: workspaceRoot,
+		parser:        parser,
+		spec:          GoSpec,
 	}, nil
 }
