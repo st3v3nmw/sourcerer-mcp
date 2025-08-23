@@ -7,7 +7,7 @@ import (
 
 var MarkdownSpec = &LanguageSpec{
 	ExtractChildrenIn: []string{"section"},
-	Ignore: []string{
+	IgnoreTypes: []string{
 		// Headings are organizational markers, not containers.
 		"atx_heading", "setext_heading",
 		// We're chunking by section so lower level nodes don't get their own chunks

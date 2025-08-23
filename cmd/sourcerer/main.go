@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	_ "embed"
 
@@ -13,6 +14,8 @@ import (
 var Version string
 
 func main() {
+	Version = strings.TrimSpace(Version)
+
 	workspaceRoot := os.Getenv("SOURCERER_WORKSPACE_ROOT")
 	if workspaceRoot == "" {
 		workspaceRoot = "."

@@ -39,7 +39,8 @@ var GoSpec = &LanguageSpec{
 			NameQuery: `(const_declaration (const_spec name: (identifier) @name))`,
 		},
 	},
-	Ignore: []string{
+	CommentTypes: []string{"comment"},
+	IgnoreTypes: []string{
 		"package_clause", // pollutes results with single-line matches
 	},
 	FileTypeRules: []FileTypeRule{

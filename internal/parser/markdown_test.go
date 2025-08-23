@@ -27,8 +27,8 @@ func (s *MarkdownParserTestSuite) TestSectionParsing() {
 		path      string
 		summary   string
 		source    string
-		startLine uint
-		endLine   uint
+		startLine int
+		endLine   int
 	}{
 		{
 			name:    "Document Root Section",
@@ -295,8 +295,8 @@ Final paragraph with **bold text** and *italic text* and even ***bold italic***.
 			s.Equal(test.path, chunk.Path)
 			s.Equal(test.summary, chunk.Summary)
 			s.Equal(test.source, chunk.Source)
-			s.Equal(test.startLine, chunk.StartLine)
-			s.Equal(test.endLine, chunk.EndLine)
+			s.Equal(test.startLine, int(chunk.StartLine))
+			s.Equal(test.endLine, int(chunk.EndLine))
 			s.Equal("markdown/comprehensive.md::"+test.path, chunk.ID())
 		})
 	}

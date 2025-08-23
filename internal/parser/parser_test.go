@@ -1,7 +1,6 @@
 package parser_test
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/st3v3nmw/sourcerer-mcp/internal/parser"
@@ -26,8 +25,6 @@ func (s *ParserBaseTestSuite) getChunks(filePath string) map[string]*parser.Chun
 	chunks := make(map[string]*parser.Chunk)
 	for _, chunk := range file.Chunks {
 		chunks[chunk.Path] = chunk
-
-		fmt.Println(chunk.Path, chunk.Summary)
 	}
 
 	return chunks

@@ -27,9 +27,17 @@ func (s *GoParserTestSuite) TestFunctionParsing() {
 		path      string
 		summary   string
 		source    string
-		startLine uint
-		endLine   uint
+		startLine int
+		endLine   int
 	}{
+		{
+			name:      "Package Comments Hashing",
+			path:      "f2bcc925c6085e27",
+			summary:   "// Function tests",
+			source:    `// Function tests`,
+			startLine: 1,
+			endLine:   1,
+		},
 		{
 			name:    "Imports Hashing",
 			path:    "44983311c5db2e3",
@@ -38,94 +46,94 @@ func (s *GoParserTestSuite) TestFunctionParsing() {
 	"context"
 	"fmt"
 )`,
-			startLine: 3,
-			endLine:   6,
-		},
-		{
-			name:      "Comments Hashing",
-			path:      "399e014a89b03d0a",
-			summary:   "// SimpleFunction demonstrates basic function parsing",
-			source:    `// SimpleFunction demonstrates basic function parsing`,
-			startLine: 17,
-			endLine:   17,
+			startLine: 5,
+			endLine:   8,
 		},
 		{
 			name:    "Simple Function",
 			path:    "SimpleFunction",
 			summary: "func SimpleFunction(x int) string {",
-			source: `func SimpleFunction(x int) string {
+			source: `// SimpleFunction demonstrates basic function parsing
+func SimpleFunction(x int) string {
 	return fmt.Sprintf("%d", x)
 }`,
-			startLine: 18,
-			endLine:   20,
+			startLine: 19,
+			endLine:   22,
 		},
 		{
 			name:    "Multiple Params Function",
 			path:    "MultipleParams",
 			summary: "func MultipleParams(a string, b int, c bool) (string, error) {",
-			source: `func MultipleParams(a string, b int, c bool) (string, error) {
+			source: `// MultipleParams shows function with multiple parameters and return values
+func MultipleParams(a string, b int, c bool) (string, error) {
 	if c {
 		return fmt.Sprintf("%s-%d", a, b), nil
 	}
 
 	return "", fmt.Errorf("invalid")
 }`,
-			startLine: 23,
-			endLine:   29,
+			startLine: 24,
+			endLine:   31,
 		},
 		{
 			name:    "No Params Function",
 			path:    "NoParams",
 			summary: "func NoParams() {",
-			source: `func NoParams() {
+			source: `// NoParams function with no parameters
+func NoParams() {
 	fmt.Println("no params")
 }`,
-			startLine: 32,
-			endLine:   34,
+			startLine: 33,
+			endLine:   36,
 		},
 		{
 			name:    "No Return Function",
 			path:    "NoReturn",
 			summary: "func NoReturn(x int) {",
-			source: `func NoReturn(x int) {
+			source: `// NoReturn function with no return values
+func NoReturn(x int) {
 	fmt.Printf("got %d\n", x)
 }`,
-			startLine: 37,
-			endLine:   39,
+			startLine: 38,
+			endLine:   41,
 		},
 		{
-			name:      "Empty Function",
-			path:      "EmptyFunction",
-			summary:   "func EmptyFunction() {}",
-			source:    `func EmptyFunction() {}`,
-			startLine: 42,
-			endLine:   42,
+			name:    "Empty Function",
+			path:    "EmptyFunction",
+			summary: "func EmptyFunction() {}",
+			source: `// EmptyFunction with empty body
+func EmptyFunction() {}`,
+			startLine: 43,
+			endLine:   44,
 		},
 		{
 			name:    "Complex Signature",
 			path:    "ComplexSignature",
 			summary: "func ComplexSignature(ctx context.Context, data map[string]interface{}, opts ...func(*Config))...",
-			source: `func ComplexSignature(ctx context.Context, data map[string]interface{}, opts ...func(*Config)) (*Result, error) {
+			source: `// ComplexSignature with various parameter types
+func ComplexSignature(ctx context.Context, data map[string]interface{}, opts ...func(*Config)) (*Result, error) {
 	return &Result{Success: true}, nil
 }`,
-			startLine: 45,
-			endLine:   47,
+			startLine: 46,
+			endLine:   49,
 		},
 		{
 			name:    "Variadic Function",
 			path:    "VariadicFunction",
 			summary: "func VariadicFunction(first string, others ...int) int {",
-			source: `func VariadicFunction(first string, others ...int) int {
+			source: `// VariadicFunction with variadic parameters
+func VariadicFunction(first string, others ...int) int {
 	return len(others)
 }`,
-			startLine: 50,
-			endLine:   52,
+			startLine: 51,
+			endLine:   54,
 		},
 		{
 			name:    "Generic Function",
 			path:    "GenericFunction",
 			summary: "func GenericFunction[T any](items []T) T {",
-			source: `func GenericFunction[T any](items []T) T {
+			source: `// GenericFunction with type parameters
+func GenericFunction[T any](items []T) T {
 	var zero T
 	if len(items) == 0 {
 		return zero
@@ -133,38 +141,53 @@ func (s *GoParserTestSuite) TestFunctionParsing() {
 
 	return items[0]
 }`,
-			startLine: 55,
-			endLine:   62,
+			startLine: 56,
+			endLine:   64,
 		},
 		{
 			name:    "Duplicate Name Function",
 			path:    "DuplicateNameFunction",
 			summary: "func DuplicateNameFunction() string {",
-			source: `func DuplicateNameFunction() string {
+			source: `// DuplicateNameFunction - testing duplicate function names
+
+func DuplicateNameFunction() string {
 	return "duplicate name"
 }`,
-			startLine: 65,
-			endLine:   67,
+			startLine: 66,
+			endLine:   70,
 		},
 		{
 			name:    "Duplicate Name Function - 2",
 			path:    "DuplicateNameFunction-2",
 			summary: "func DuplicateNameFunction() string {",
-			source: `func DuplicateNameFunction() string {
+			source: `// DuplicateNameFunction (2)
+// Testing duplicate function names
+func DuplicateNameFunction() string {
 	return "duplicate name"
 }`,
-			startLine: 70,
-			endLine:   72,
+			startLine: 72,
+			endLine:   76,
 		},
 		{
 			name:    "Duplicate Name Function - 3",
 			path:    "DuplicateNameFunction-3",
 			summary: "func DuplicateNameFunction() string {",
-			source: `func DuplicateNameFunction() string {
+			source: `// DuplicateNameFunction (3)
+//
+// Testing duplicate function names
+func DuplicateNameFunction() string {
 	return "duplicate name"
 }`,
-			startLine: 75,
-			endLine:   77,
+			startLine: 78,
+			endLine:   83,
+		},
+		{
+			name:      "Standalone Comment Hashing",
+			path:      "d5d69632b4d3fba5",
+			summary:   "// A standalone comment",
+			source:    `// A standalone comment`,
+			startLine: 85,
+			endLine:   85,
 		},
 	}
 
@@ -178,8 +201,8 @@ func (s *GoParserTestSuite) TestFunctionParsing() {
 			s.Equal(test.path, chunk.Path)
 			s.Equal(test.summary, chunk.Summary)
 			s.Equal(test.source, chunk.Source)
-			s.Equal(test.startLine, chunk.StartLine)
-			s.Equal(test.endLine, chunk.EndLine)
+			s.Equal(test.startLine, int(chunk.StartLine))
+			s.Equal(test.endLine, int(chunk.EndLine))
 			s.Equal("go/functions.go::"+test.path, chunk.ID())
 		})
 	}
@@ -193,44 +216,48 @@ func (s *GoParserTestSuite) TestMethodParsing() {
 		path      string
 		summary   string
 		source    string
-		startLine uint
-		endLine   uint
+		startLine int
+		endLine   int
 	}{
 		{
 			name:    "Value Receiver Method",
 			path:    "User::GetName",
 			summary: "func (u User) GetName() string {",
-			source: `func (u User) GetName() string {
+			source: `// GetName is a value receiver method
+func (u User) GetName() string {
 	return u.Name
 }`,
-			startLine: 10,
+			startLine: 9,
 			endLine:   12,
 		},
 		{
 			name:    "Pointer Receiver Method",
 			path:    "User::SetName",
 			summary: "func (u *User) SetName(name string) {",
-			source: `func (u *User) SetName(name string) {
+			source: `// SetName is a pointer receiver method
+func (u *User) SetName(name string) {
 	u.Name = name
 }`,
-			startLine: 15,
+			startLine: 14,
 			endLine:   17,
 		},
 		{
 			name:    "Service Add User Method",
 			path:    "Service::AddUser",
 			summary: "func (s *Service) AddUser(user User) {",
-			source: `func (s *Service) AddUser(user User) {
+			source: `// AddUser adds a user to the service
+func (s *Service) AddUser(user User) {
 	s.users = append(s.users, user)
 }`,
-			startLine: 25,
+			startLine: 24,
 			endLine:   27,
 		},
 		{
 			name:    "Service Find User Method",
 			path:    "Service::FindUser",
 			summary: "func (s *Service) FindUser(id int) *User {",
-			source: `func (s *Service) FindUser(id int) *User {
+			source: `// FindUser finds a user by ID
+func (s *Service) FindUser(id int) *User {
 	for i := range s.users {
 		if s.users[i].ID == id {
 			return &s.users[i]
@@ -239,47 +266,51 @@ func (s *GoParserTestSuite) TestMethodParsing() {
 
 	return nil
 }`,
-			startLine: 30,
+			startLine: 29,
 			endLine:   38,
 		},
 		{
 			name:    "Service Count Method",
 			path:    "Service::Count",
 			summary: "func (s Service) Count() int {",
-			source: `func (s Service) Count() int {
+			source: `// Count returns the number of users
+func (s Service) Count() int {
 	return len(s.users)
 }`,
-			startLine: 41,
+			startLine: 40,
 			endLine:   43,
 		},
 		{
 			name:    "Generic Pointer Receiver Method",
 			path:    "Repository::Add",
 			summary: "func (r *Repository[T]) Add(item T) {",
-			source: `func (r *Repository[T]) Add(item T) {
+			source: `// Add adds an item to the repository
+func (r *Repository[T]) Add(item T) {
 	r.items = append(r.items, item)
 }`,
-			startLine: 51,
+			startLine: 50,
 			endLine:   53,
 		},
 		{
 			name:    "Generic Value Receiver Method",
 			path:    "Repository::Get",
 			summary: "func (r Repository[T]) Get(index int) T {",
-			source: `func (r Repository[T]) Get(index int) T {
+			source: `// Get retrieves an item by index
+func (r Repository[T]) Get(index int) T {
 	return r.items[index]
 }`,
-			startLine: 56,
+			startLine: 55,
 			endLine:   58,
 		},
 		{
 			name:    "Generic Size Method",
 			path:    "Repository::Size",
 			summary: "func (r Repository[T]) Size() int {",
-			source: `func (r Repository[T]) Size() int {
+			source: `// Size returns the number of items
+func (r Repository[T]) Size() int {
 	return len(r.items)
 }`,
-			startLine: 61,
+			startLine: 60,
 			endLine:   63,
 		},
 		{
@@ -314,8 +345,8 @@ func (s *GoParserTestSuite) TestMethodParsing() {
 			s.Equal(test.path, chunk.Path)
 			s.Equal(test.summary, chunk.Summary)
 			s.Equal(test.source, chunk.Source)
-			s.Equal(test.startLine, chunk.StartLine)
-			s.Equal(test.endLine, chunk.EndLine)
+			s.Equal(test.startLine, int(chunk.StartLine))
+			s.Equal(test.endLine, int(chunk.EndLine))
 			s.Equal("go/methods.go::"+test.path, chunk.ID())
 		})
 	}
@@ -329,154 +360,169 @@ func (s *GoParserTestSuite) TestTypeParsing() {
 		path      string
 		summary   string
 		source    string
-		startLine uint
-		endLine   uint
+		startLine int
+		endLine   int
 	}{
 		{
 			name:    "Basic Struct",
 			path:    "BasicStruct",
 			summary: "type BasicStruct struct {",
-			source: `type BasicStruct struct {
+			source: `// BasicStruct demonstrates struct type parsing
+type BasicStruct struct {
 	Field1 string
 	Field2 int
 }`,
-			startLine: 4,
+			startLine: 3,
 			endLine:   7,
 		},
 		{
-			name:      "Empty Struct",
-			path:      "EmptyStruct",
-			summary:   "type EmptyStruct struct{}",
-			source:    `type EmptyStruct struct{}`,
-			startLine: 10,
+			name:    "Empty Struct",
+			path:    "EmptyStruct",
+			summary: "type EmptyStruct struct{}",
+			source: `// EmptyStruct demonstrates empty struct
+type EmptyStruct struct{}`,
+			startLine: 9,
 			endLine:   10,
 		},
 		{
 			name:    "Embedded Struct",
 			path:    "EmbeddedStruct",
 			summary: "type EmbeddedStruct struct {",
-			source: `type EmbeddedStruct struct {
+			source: `// EmbeddedStruct demonstrates struct with embedded fields
+type EmbeddedStruct struct {
 	BasicStruct
 	ExtraField bool
 }`,
-			startLine: 13,
+			startLine: 12,
 			endLine:   16,
 		},
 		{
 			name:    "Simple Interface",
 			path:    "SimpleInterface",
 			summary: "type SimpleInterface interface {",
-			source: `type SimpleInterface interface {
+			source: `// SimpleInterface demonstrates interface parsing
+type SimpleInterface interface {
 	Method1() string
 	Method2(int) error
 }`,
-			startLine: 19,
+			startLine: 18,
 			endLine:   22,
 		},
 		{
-			name:      "Empty Interface",
-			path:      "EmptyInterface",
-			summary:   "type EmptyInterface interface{}",
-			source:    `type EmptyInterface interface{}`,
-			startLine: 25,
+			name:    "Empty Interface",
+			path:    "EmptyInterface",
+			summary: "type EmptyInterface interface{}",
+			source: `// EmptyInterface demonstrates empty interface
+type EmptyInterface interface{}`,
+			startLine: 24,
 			endLine:   25,
 		},
 		{
 			name:    "Embedded Interface",
 			path:    "EmbeddedInterface",
 			summary: "type EmbeddedInterface interface {",
-			source: `type EmbeddedInterface interface {
+			source: `// EmbeddedInterface demonstrates interface composition
+type EmbeddedInterface interface {
 	SimpleInterface
 	Method3() bool
 }`,
-			startLine: 28,
+			startLine: 27,
 			endLine:   31,
 		},
 		{
 			name:    "Generic Type",
 			path:    "GenericType",
 			summary: "type GenericType[T any] struct {",
-			source: `type GenericType[T any] struct {
+			source: `// GenericType demonstrates generic type declaration
+type GenericType[T any] struct {
 	Value T
 }`,
-			startLine: 34,
+			startLine: 33,
 			endLine:   36,
 		},
 		{
 			name:    "Constrained Generic",
 			path:    "ConstrainedGeneric",
 			summary: "type ConstrainedGeneric[T comparable] struct {",
-			source: `type ConstrainedGeneric[T comparable] struct {
+			source: `// ConstrainedGeneric demonstrates generic with constraints
+type ConstrainedGeneric[T comparable] struct {
 	Key   T
 	Value string
 }`,
-			startLine: 39,
+			startLine: 38,
 			endLine:   42,
 		},
 		{
-			name:      "Multiple Generics",
-			path:      "MultipleGenerics",
-			summary:   "type MultipleGenerics[K comparable, V any] map[K]V",
-			source:    `type MultipleGenerics[K comparable, V any] map[K]V`,
-			startLine: 45,
+			name:    "Multiple Generics",
+			path:    "MultipleGenerics",
+			summary: "type MultipleGenerics[K comparable, V any] map[K]V",
+			source: `// MultipleGenerics demonstrates multiple type parameters
+type MultipleGenerics[K comparable, V any] map[K]V`,
+			startLine: 44,
 			endLine:   45,
 		},
 		{
-			name:      "Type Alias",
-			path:      "TypeAlias",
-			summary:   "type TypeAlias = string",
-			source:    `type TypeAlias = string`,
-			startLine: 48,
+			name:    "Type Alias",
+			path:    "TypeAlias",
+			summary: "type TypeAlias = string",
+			source: `// TypeAlias demonstrates type alias
+type TypeAlias = string`,
+			startLine: 47,
 			endLine:   48,
 		},
 		{
-			name:      "Custom Type",
-			path:      "CustomType",
-			summary:   "type CustomType string",
-			source:    `type CustomType string`,
-			startLine: 51,
+			name:    "Custom Type",
+			path:    "CustomType",
+			summary: "type CustomType string",
+			source: `// CustomType demonstrates custom type based on existing type
+type CustomType string`,
+			startLine: 50,
 			endLine:   51,
 		},
 		{
 			name:    "Consts Block Hashing",
 			path:    "796012d7ee1311f0",
 			summary: "const (",
-			source: `const (
+			source: `// Constants for testing const parsing
+const (
 	StatusActive   = "active"
 	StatusInactive = "inactive"
 	MaxRetries     = 5
 )`,
-			startLine: 54,
+			startLine: 53,
 			endLine:   58,
 		}, {
-			name:      "Single Constant",
-			path:      "DefaultTimeout",
-			summary:   "const DefaultTimeout = 30",
-			source:    `const DefaultTimeout = 30`,
-			startLine: 61,
+			name:    "Single Constant",
+			path:    "DefaultTimeout",
+			summary: "const DefaultTimeout = 30",
+			source: `// Single constant
+const DefaultTimeout = 30`,
+			startLine: 60,
 			endLine:   61,
 		},
 		{
 			name:    "Vars Block Hashing",
 			path:    "3a12064c73be460c",
 			summary: "var (",
-			source: `var (
+			source: `// Variables for testing var parsing
+var (
 	GlobalCounter int
 	SystemReady   bool = true
 	ConfigPath    string
 )`,
-			startLine: 64,
+			startLine: 63,
 			endLine:   68,
 		},
 		{
 			name:    "Single Variable",
 			path:    "DefaultConfig",
 			summary: "var DefaultConfig = BasicStruct{",
-			source: `var DefaultConfig = BasicStruct{
+			source: `// Single variable
+var DefaultConfig = BasicStruct{
 	Field1: "default",
 	Field2: 42,
 }`,
-			startLine: 71,
+			startLine: 70,
 			endLine:   74,
 		},
 	}
@@ -491,8 +537,8 @@ func (s *GoParserTestSuite) TestTypeParsing() {
 			s.Equal(test.path, chunk.Path)
 			s.Equal(test.summary, chunk.Summary)
 			s.Equal(test.source, chunk.Source)
-			s.Equal(test.startLine, chunk.StartLine)
-			s.Equal(test.endLine, chunk.EndLine)
+			s.Equal(test.startLine, int(chunk.StartLine))
+			s.Equal(test.endLine, int(chunk.EndLine))
 			s.Equal("go/types.go::"+test.path, chunk.ID())
 		})
 	}
@@ -508,13 +554,14 @@ func (s *GoParserTestSuite) TestTestFileParsing() {
 	s.Equal("tests", chunk.Type)
 	s.Equal("TestSimple", chunk.Path)
 	s.Equal("func TestSimple(t *testing.T) {", chunk.Summary)
-	s.Equal(`func TestSimple(t *testing.T) {
+	s.Equal(`// TestSimple is a basic test function
+func TestSimple(t *testing.T) {
 	if 1+1 != 2 {
 		t.Error("math is broken")
 	}
 }`, chunk.Source)
-	s.Equal(uint(6), chunk.StartLine)
-	s.Equal(uint(10), chunk.EndLine)
+	s.Equal(5, int(chunk.StartLine))
+	s.Equal(10, int(chunk.EndLine))
 	s.Equal("go/tests_test.go::TestSimple", chunk.ID())
 }
 

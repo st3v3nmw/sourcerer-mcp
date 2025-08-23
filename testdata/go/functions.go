@@ -1,3 +1,5 @@
+// Function tests
+
 package testdata
 
 import (
@@ -62,16 +64,22 @@ func GenericFunction[T any](items []T) T {
 }
 
 // DuplicateNameFunction - testing duplicate function names
+
 func DuplicateNameFunction() string {
 	return "duplicate name"
 }
 
-// DuplicateNameFunction (2) - testing duplicate function names
+// DuplicateNameFunction (2)
+// Testing duplicate function names
 func DuplicateNameFunction() string {
 	return "duplicate name"
 }
 
-// DuplicateNameFunction (3) - testing duplicate function names
+// DuplicateNameFunction (3)
+//
+// Testing duplicate function names
 func DuplicateNameFunction() string {
 	return "duplicate name"
 }
+
+// A standalone comment
