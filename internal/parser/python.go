@@ -13,12 +13,6 @@ var PythonSpec = &LanguageSpec{
 		"class_definition": {
 			NameQuery: `(class_definition name: (identifier) @name)`,
 		},
-		"method_definition": {
-			NameQuery: `
-				(class_definition
-					body: (block
-						(function_definition name: (identifier) @name)))`,
-		},
 		"decorated_definition": {
 			NameQuery: `(decorated_definition definition: [
 				(function_definition name: (identifier) @name)

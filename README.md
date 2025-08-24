@@ -96,7 +96,7 @@ to identify functions, classes, interfaces, and other code structures for each l
 
 **Supported:** Go, Markdown, Python
 
-**Planned:** TypeScript, JavaScript
+**Planned:** TypeScript, JavaScript, Rust, C++
 
 ## Contributing
 
