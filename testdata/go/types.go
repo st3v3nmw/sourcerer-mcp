@@ -67,6 +67,9 @@ var (
 	ConfigPath    string
 )
 
+// Another multi var declaration
+var x, y string
+
 // Single variable
 var DefaultConfig = BasicStruct{
 	Field1: "default",

@@ -39,17 +39,6 @@ func (s *GoParserTestSuite) TestFunctionParsing() {
 			endLine:   1,
 		},
 		{
-			name:    "Imports Hashing",
-			path:    "44983311c5db2e3",
-			summary: "import (",
-			source: `import (
-	"context"
-	"fmt"
-)`,
-			startLine: 5,
-			endLine:   8,
-		},
-		{
 			name:    "Simple Function",
 			path:    "SimpleFunction",
 			summary: "func SimpleFunction(x int) string {",
@@ -514,6 +503,15 @@ var (
 			endLine:   68,
 		},
 		{
+			name:    "Another Multi Var Declaration",
+			path:    "b9303a3de4b66c8b",
+			summary: "var x, y string",
+			source: `// Another multi var declaration
+var x, y string`,
+			startLine: 70,
+			endLine:   71,
+		},
+		{
 			name:    "Single Variable",
 			path:    "DefaultConfig",
 			summary: "var DefaultConfig = BasicStruct{",
@@ -522,8 +520,8 @@ var DefaultConfig = BasicStruct{
 	Field1: "default",
 	Field2: 42,
 }`,
-			startLine: 70,
-			endLine:   74,
+			startLine: 73,
+			endLine:   77,
 		},
 	}
 

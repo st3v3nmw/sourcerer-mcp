@@ -12,6 +12,7 @@ type Language string
 const (
 	Go          Language = "go"
 	Markdown    Language = "markdown"
+	Python      Language = "python"
 	UnknownLang Language = "unknown"
 )
 
@@ -75,5 +76,14 @@ func init() {
 		[]string{".md", ".markdown"},
 		func(workspaceRoot string) (*parser.Parser, error) {
 			return parser.NewMarkdownParser(workspaceRoot)
-		})
+		},
+	)
+
+	languages.register(
+		Python,
+		[]string{".py"},
+		func(workspaceRoot string) (*parser.Parser, error) {
+			return parser.NewPythonParser(workspaceRoot)
+		},
+	)
 }

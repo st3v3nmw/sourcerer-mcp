@@ -94,9 +94,9 @@ dramatically reducing token usage and cognitive load.
 Language support requires writing [Tree-sitter queries](https://github.com/st3v3nmw/sourcerer-mcp/blob/main/internal/parser/go.go)
 to identify functions, classes, interfaces, and other code structures for each language.
 
-**Supported:** Go, Markdown
+**Supported:** Go, Markdown, Python
 
-**Planned:** Python, TypeScript, JavaScript
+**Planned:** TypeScript, JavaScript
 
 ## Contributing
 

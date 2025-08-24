@@ -39,9 +39,11 @@ var GoSpec = &LanguageSpec{
 			NameQuery: `(const_declaration (const_spec name: (identifier) @name))`,
 		},
 	},
-	CommentTypes: []string{"comment"},
-	IgnoreTypes: []string{
-		"package_clause", // pollutes results with single-line matches
+	FoldIntoNextNode: []string{"comment"},
+	SkipTypes: []string{
+		// These pollute results
+		"package_clause",
+		"import_declaration",
 	},
 	FileTypeRules: []FileTypeRule{
 		{Pattern: "**/*_test.go", Type: FileTypeTests},

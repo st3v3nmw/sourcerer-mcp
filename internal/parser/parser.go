@@ -57,23 +57,35 @@ func (c *Chunk) ID() string {
 }
 
 // newChunk creates a new Chunk from related tree-sitter nodes
-func newChunk(
+func (p *Parser) newChunk(
 	node *tree_sitter.Node,
 	source []byte,
 	path string,
 	usedPaths map[string]bool,
 	fileType FileType,
-	comments []*tree_sitter.Node,
+	folded []*tree_sitter.Node,
+	extractor *NamedChunkExtractor,
 ) *Chunk {
 	finalPath := resolvePath(path, usedPaths)
-	startPos, startByte, endPos, endByte := calculateChunkBounds(node, comments)
-	nodeText := node.Utf8Text(source)
+	startPos, startByte, endPos, endByte := calculateChunkBounds(node, folded)
+
+	// Determine which node to use for the summary
+	summaryNode := node
+	if extractor != nil && extractor.SummaryNodeQuery != "" {
+		// Use the existing executeQuery method to find the summary node
+		matches, err := p.executeQuery(extractor.SummaryNodeQuery, node, source)
+		if err == nil && len(matches) > 0 {
+			summaryNode = matches[0]
+		}
+	}
+
+	summaryText := summaryNode.Utf8Text(source)
 	fullText := source[startByte:endByte]
 
 	return &Chunk{
 		Path:        finalPath,
 		Type:        string(fileType),
-		Summary:     summarize(nodeText),
+		Summary:     summarize(summaryText),
 		Source:      string(fullText),
 		StartLine:   startPos.Row + 1,
 		StartColumn: startPos.Column + 1,
@@ -101,8 +113,8 @@ func resolvePath(path string, usedPaths map[string]bool) string {
 }
 
 // calculateChunkBounds determines the start and end positions for a chunk,
-// extending to include any preceding comments
-func calculateChunkBounds(node *tree_sitter.Node, comments []*tree_sitter.Node) (
+// extending to include any preceding folded nodes
+func calculateChunkBounds(node *tree_sitter.Node, folded []*tree_sitter.Node) (
 	startPos tree_sitter.Point, startByte uint,
 	endPos tree_sitter.Point, endByte uint,
 ) {
@@ -111,10 +123,10 @@ func calculateChunkBounds(node *tree_sitter.Node, comments []*tree_sitter.Node) 
 	endPos = node.EndPosition()
 	endByte = node.EndByte()
 
-	if len(comments) > 0 {
-		firstComment := comments[0]
-		startPos = firstComment.StartPosition()
-		startByte = firstComment.StartByte()
+	if len(folded) > 0 {
+		firstFolded := folded[0]
+		startPos = firstFolded.StartPosition()
+		startByte = firstFolded.StartByte()
 	}
 
 	return startPos, startByte, endPos, endByte
@@ -147,15 +159,16 @@ func summarize(source string) string {
 type LanguageSpec struct {
 	NamedChunks       map[string]NamedChunkExtractor // node types that can be extracted by name
 	ExtractChildrenIn []string                       // node types whose children should be recursively processed
-	CommentTypes      []string                       // node types that represent comments
-	IgnoreTypes       []string                       // node types to completely skip
+	FoldIntoNextNode  []string                       // node types to fold into next node, e.g., comments
+	SkipTypes         []string                       // node types to completely skip
 	FileTypeRules     []FileTypeRule                 // language-specific file type classification rules
 }
 
 // NamedChunkExtractor defines tree-sitter queries for extracting named code entities
 type NamedChunkExtractor struct {
-	NameQuery       string // query to extract the entity name
-	ParentNameQuery string // optional query to extract parent entity name for hierarchical paths
+	NameQuery        string // query to extract the entity name
+	ParentNameQuery  string // optional query to extract parent entity name for hierarchical paths
+	SummaryNodeQuery string // optional query to extract a specific node for the summary instead of the main node
 }
 
 // FileTypeRule defines a pattern-based rule for classifying file types
@@ -246,7 +259,6 @@ func (p *Parser) classifyFileType(filePath string) FileType {
 }
 
 // extractChunks recursively extracts semantic chunks from an AST node.
-// Comments are collected and folded into the next non-comment chunk to improve context.
 func (p *Parser) extractChunks(
 	node *tree_sitter.Node,
 	source []byte,
@@ -255,31 +267,31 @@ func (p *Parser) extractChunks(
 ) []*Chunk {
 	var chunks []*Chunk
 	usedPaths := map[string]bool{}
-	var comments []*tree_sitter.Node
+	var folded []*tree_sitter.Node
 
 	for i := uint(0); i < node.ChildCount(); i++ {
 		child := node.Child(i)
 		kind := child.Kind()
 
-		if slices.Contains(p.spec.IgnoreTypes, kind) {
-			// Process any preceding comments as standalone chunks
-			for _, comment := range comments {
-				chunks = append(chunks, p.extractNode(comment, source, usedPaths, fileType, nil))
+		if slices.Contains(p.spec.SkipTypes, kind) {
+			// Process any remaining folded nodes as standalone chunks
+			for _, foldedNode := range folded {
+				chunks = append(chunks, p.extractNode(foldedNode, source, usedPaths, fileType, nil))
 			}
-			comments = nil
+			folded = nil
 
 			continue
 		}
 
-		if slices.Contains(p.spec.CommentTypes, kind) {
-			comments = append(comments, child)
+		if slices.Contains(p.spec.FoldIntoNextNode, kind) {
+			folded = append(folded, child)
 			continue
 		}
 
-		// Process code nodes & fold comments, if any
-		chunk, path := p.createChunkFromNode(child, source, parentPath, fileType, usedPaths, comments)
+		// Process code nodes & folded nodes, if any
+		chunk, path := p.createChunkFromNode(child, source, parentPath, fileType, usedPaths, folded)
 		chunks = append(chunks, chunk)
-		comments = nil
+		folded = nil
 
 		// Recursively process children if specified
 		if slices.Contains(p.spec.ExtractChildrenIn, kind) {
@@ -288,9 +300,9 @@ func (p *Parser) extractChunks(
 		}
 	}
 
-	// Process any remaining comments as standalone chunks
-	for _, comment := range comments {
-		chunks = append(chunks, p.extractNode(comment, source, usedPaths, fileType, nil))
+	// Process any remaining folded nodes as standalone chunks
+	for _, foldedNode := range folded {
+		chunks = append(chunks, p.extractNode(foldedNode, source, usedPaths, fileType, nil))
 	}
 
 	return chunks
@@ -303,7 +315,7 @@ func (p *Parser) createChunkFromNode(
 	parentPath string,
 	fileType FileType,
 	usedPaths map[string]bool,
-	comments []*tree_sitter.Node,
+	folded []*tree_sitter.Node,
 ) (*Chunk, string) {
 	kind := node.Kind()
 	extractor, exists := p.spec.NamedChunks[kind]
@@ -311,13 +323,13 @@ func (p *Parser) createChunkFromNode(
 	if exists {
 		chunkPath, err := p.buildChunkPath(extractor, node, source, parentPath)
 		if err == nil {
-			chunk := newChunk(node, source, chunkPath, usedPaths, fileType, comments)
+			chunk := p.newChunk(node, source, chunkPath, usedPaths, fileType, folded, &extractor)
 			return chunk, chunkPath
 		}
 	}
 
 	// No named extractor or building chunk path failed, use content-hash
-	return p.extractNode(node, source, usedPaths, fileType, comments), parentPath
+	return p.extractNode(node, source, usedPaths, fileType, folded), parentPath
 }
 
 // extractNode creates a chunk from a node using content-based hashing for the path
@@ -326,12 +338,12 @@ func (p *Parser) extractNode(
 	source []byte,
 	usedPaths map[string]bool,
 	fileType FileType,
-	comments []*tree_sitter.Node,
+	folded []*tree_sitter.Node,
 ) *Chunk {
 	nodeSource := node.Utf8Text(source)
 	hash := fmt.Sprintf("%x", xxhash.Sum64String(nodeSource))
 
-	return newChunk(node, source, hash, usedPaths, fileType, comments)
+	return p.newChunk(node, source, hash, usedPaths, fileType, folded, nil)
 }
 
 // buildChunkPath constructs a hierarchical path for a named chunk using tree-sitter queries
