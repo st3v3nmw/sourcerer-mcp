@@ -11,6 +11,7 @@ type Language string
 
 const (
 	Go          Language = "go"
+	JavaScript  Language = "javascript"
 	Markdown    Language = "markdown"
 	Python      Language = "python"
 	UnknownLang Language = "unknown"
@@ -68,6 +69,14 @@ func init() {
 		[]string{".go"},
 		func(workspaceRoot string) (*parser.Parser, error) {
 			return parser.NewGoParser(workspaceRoot)
+		},
+	)
+
+	languages.register(
+		JavaScript,
+		[]string{".js", ".jsx", ".mjs"},
+		func(workspaceRoot string) (*parser.Parser, error) {
+			return parser.NewJavaScriptParser(workspaceRoot)
 		},
 	)
 

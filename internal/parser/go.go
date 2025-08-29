@@ -41,7 +41,7 @@ var GoSpec = &LanguageSpec{
 	},
 	FoldIntoNextNode: []string{"comment"},
 	SkipTypes: []string{
-		// These pollute results
+		// These pollute search results
 		"package_clause",
 		"import_declaration",
 	},

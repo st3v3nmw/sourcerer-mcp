@@ -25,6 +25,8 @@ func (s *ParserBaseTestSuite) getChunks(filePath string) map[string]*parser.Chun
 	chunks := make(map[string]*parser.Chunk)
 	for _, chunk := range file.Chunks {
 		chunks[chunk.Path] = chunk
+
+		s.T().Logf("%s | %s", chunk.Path, chunk.Summary)
 	}
 
 	return chunks

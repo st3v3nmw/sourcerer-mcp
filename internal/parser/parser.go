@@ -180,14 +180,16 @@ type FileTypeRule struct {
 // globalFileTyleRules contains universal file type classification patterns
 // that apply across all programming languages
 var globalFileTyleRules = []FileTypeRule{
-	{Pattern: "tests/**", Type: FileTypeTests},
-	{Pattern: "test/**", Type: FileTypeTests},
+	{Pattern: "**/tests/**", Type: FileTypeTests},
+	{Pattern: "**/test/**", Type: FileTypeTests},
 	{Pattern: "**/testdata/**", Type: FileTypeTests},
 
 	{Pattern: "docs/**", Type: FileTypeDocs},
 	{Pattern: "doc/**", Type: FileTypeDocs},
 
 	{Pattern: ".git/**", Type: FileTypeIgnore},
+	{Pattern: "coverage/**", Type: FileTypeIgnore},
+	{Pattern: ".coverage/**", Type: FileTypeIgnore},
 }
 
 // Parser handles parsing and semantic chunk extraction from source files

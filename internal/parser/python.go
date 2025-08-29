@@ -26,7 +26,7 @@ var PythonSpec = &LanguageSpec{
 	},
 	FoldIntoNextNode: []string{"comment"},
 	SkipTypes: []string{
-		// These pollute results
+		// These pollute search results
 		"import_statement",
 	},
 	FileTypeRules: []FileTypeRule{
