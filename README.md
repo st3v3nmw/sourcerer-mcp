@@ -55,7 +55,7 @@ claude mcp add sourcerer -e OPENAI_API_KEY=your-openai-api-key -e SOURCERER_WORK
 
 ## How it Works
 
-Sourcerer builds a semantic search index of your codebase:
+Sourcerer 🧙 builds a semantic search index of your codebase:
 
 ### 1. Code Parsing & Chunking
 
@@ -91,12 +91,12 @@ dramatically reducing token usage and cognitive load.
 
 ## Supported Languages
 
-Language support requires writing [Tree-sitter queries](https://github.com/st3v3nmw/sourcerer-mcp/blob/main/internal/parser/go.go)
-to identify functions, classes, interfaces, and other code structures for each language.
+Language support requires writing [Tree-sitter queries](https://github.com/st3v3nmw/sourcerer-mcp/blob/main/internal/parser/go.go) to
+identify functions, classes, interfaces, and other code structures for each language.
 
 **Supported:** Go, JavaScript, Markdown, Python, TypeScript
 
-**Planned:** C, C++, Java, Ruby, Rust
+**Planned:** C, C++, Java, Ruby, Rust, and others
 
 ## Contributing
 
