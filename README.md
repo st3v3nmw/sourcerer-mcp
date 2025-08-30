@@ -6,7 +6,7 @@ jump directly to the specific functions, classes, and code chunks they need.
 
 ## Demo
 
-[![asciicast](https://asciinema.org/a/734069.svg)](https://asciinema.org/a/734069)
+[![asciicast](https://asciinema.org/a/736638.svg)](https://asciinema.org/a/736638)
 
 ## Requirements
 
@@ -96,7 +96,7 @@ to identify functions, classes, interfaces, and other code structures for each l
 
 **Supported:** Go, JavaScript, Markdown, Python, TypeScript
 
-**Planned:** Rust, C, C++
+**Planned:** C, C++, Java, Ruby, Rust
 
 ## Contributing
 

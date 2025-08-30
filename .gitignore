@@ -24,3 +24,6 @@ go.work.sum
 
 # Sourcerer
 .sourcerer/
+
+# Demos
+demo.cast
