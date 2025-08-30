@@ -10,11 +10,11 @@ var JavaScriptSpec = &LanguageSpec{
 		"function_declaration": {
 			NameQuery: `(function_declaration name: (identifier) @name)`,
 		},
-		"class_declaration": {
-			NameQuery: `(class_declaration name: (identifier) @name)`,
-		},
 		"generator_function_declaration": {
 			NameQuery: `(generator_function_declaration name: (identifier) @name)`,
+		},
+		"class_declaration": {
+			NameQuery: `(class_declaration name: (identifier) @name)`,
 		},
 		"lexical_declaration": {
 			NameQuery: `(lexical_declaration (variable_declarator name: (identifier) @name))`,

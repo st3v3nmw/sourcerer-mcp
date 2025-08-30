@@ -14,6 +14,7 @@ const (
 	JavaScript  Language = "javascript"
 	Markdown    Language = "markdown"
 	Python      Language = "python"
+	TypeScript  Language = "typescript"
 	UnknownLang Language = "unknown"
 )
 
@@ -93,6 +94,14 @@ func init() {
 		[]string{".py"},
 		func(workspaceRoot string) (*parser.Parser, error) {
 			return parser.NewPythonParser(workspaceRoot)
+		},
+	)
+
+	languages.register(
+		TypeScript,
+		[]string{".ts", ".tsx"},
+		func(workspaceRoot string) (*parser.Parser, error) {
+			return parser.NewTypeScriptParser(workspaceRoot)
 		},
 	)
 }
