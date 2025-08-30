@@ -1,7 +1,8 @@
 # Sourcerer MCP 🧙
 
 An MCP server for semantic code search & navigation that helps AI agents work
-efficiently without burning through costly tokens. Instead of reading entire files, agents can search conceptually and
+efficiently without burning through costly tokens.
+Instead of reading entire files, agents can search conceptually and
 jump directly to the specific functions, classes, and code chunks they need.
 
 ## Demo
@@ -100,4 +101,4 @@ identify functions, classes, interfaces, and other code structures for each lang
 
 ## Contributing
 
-All contributions welcome!
+All contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
