@@ -102,3 +102,9 @@ identify functions, classes, interfaces, and other code structures for each lang
 ## Contributing
 
 All contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+```
+$ ls @stephenmwangi.com
+- gh:st3v3nmw/obsidian-spaced-repetition
+- gh:st3v3nmw/lsfr
+```
