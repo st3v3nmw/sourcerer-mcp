@@ -160,7 +160,14 @@ func (a *Analyzer) getSingleChunkCode(ctx context.Context, id string) string {
 		return fmt.Sprintf("== %s ==\n\n<source not found for chunk>\n\n", id)
 	}
 
-	return fmt.Sprintf("== %s ==\n\n%s\n\n", id, chunk.Source)
+	var lineInfo string
+	if chunk.StartLine == chunk.EndLine {
+		lineInfo = fmt.Sprintf(" [line %d]", chunk.StartLine)
+	} else {
+		lineInfo = fmt.Sprintf(" [lines %d-%d]", chunk.StartLine, chunk.EndLine)
+	}
+
+	return fmt.Sprintf("== %s%s ==\n\n%s\n\n", id, lineInfo, chunk.Source)
 }
 
 func (a *Analyzer) GetIndexStatus() (int, time.Time) {
