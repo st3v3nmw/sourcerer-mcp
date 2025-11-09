@@ -57,7 +57,7 @@ func (a *Analyzer) IndexWorkspace(ctx context.Context) {
 
 	var filesToProcess []string
 	fs.WalkSourceFiles(a.workspaceRoot, languages.supportedExts(), func(filePath string) error {
-		if a.index.IsStale(filePath) {
+		if a.index.IsStale(ctx, filePath) {
 			filesToProcess = append(filesToProcess, filePath)
 		}
 
@@ -65,6 +65,9 @@ func (a *Analyzer) IndexWorkspace(ctx context.Context) {
 	})
 
 	a.processFiles(ctx, filesToProcess)
+
+	// Clean up any files that were deleted while watcher wasn't running
+	a.index.CleanupDeletedFiles(ctx)
 }
 
 func (a *Analyzer) handleFileChange(ctx context.Context, filePaths []string) {
@@ -76,18 +79,17 @@ func (a *Analyzer) processFiles(ctx context.Context, filePaths []string) {
 		return
 	}
 
+	a.indexMu.Lock()
+	defer a.indexMu.Unlock()
+
 	a.nPendingFiles = len(filePaths)
 	for _, filePath := range filePaths {
 		a.chunk(ctx, filePath)
 
-		a.indexMu.Lock()
 		a.nPendingFiles = max(a.nPendingFiles-1, 0)
-		a.indexMu.Unlock()
 	}
 
-	a.indexMu.Lock()
 	a.lastIndexedAt = time.Now()
-	a.indexMu.Unlock()
 }
 
 func (a *Analyzer) getParser(filePath string) (*parser.Parser, error) {
@@ -157,7 +159,7 @@ func (a *Analyzer) getSingleChunkCode(ctx context.Context, id string) string {
 
 	chunk, err := a.index.GetChunk(ctx, id)
 	if err != nil {
-		return fmt.Sprintf("== %s ==\n\n<source not found for chunk>\n\n", id)
+		return fmt.Sprintf("== %s ==\n\n<error getting source: %v>\n\n", id, err)
 	}
 
 	var lineInfo string

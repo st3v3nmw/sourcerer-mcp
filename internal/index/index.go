@@ -7,7 +7,6 @@ import (
 	"runtime"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/philippgille/chromem-go"
@@ -19,80 +18,78 @@ const (
 	maxResults    = 30
 )
 
-type ChunkMetadata struct {
-	Type     string // chunk type (src, docs, etc)
-	Path     string // hierarchical path: Class::method
-	ParsedAt int64  // when chunk was parsed
-}
-
 type Index struct {
 	workspaceRoot string
 	collection    *chromem.Collection
 
-	cache   map[string][]*ChunkMetadata
+	cache   map[string]int64 // filePath -> max parsedAt timestamp
 	cacheMu sync.RWMutex
+
+	initOnce sync.Once
+	initErr  error
 }
 
 func New(ctx context.Context, workspaceRoot string) (*Index, error) {
-	db, err := chromem.NewPersistentDB(".sourcerer/db", false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vector db: %w", err)
-	}
-
-	collection, err := db.GetOrCreateCollection("code-chunks", nil, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vector db collection: %w", err)
-	}
-
 	idx := &Index{
 		workspaceRoot: workspaceRoot,
-		collection:    collection,
-		cache:         map[string][]*ChunkMetadata{},
+		cache:         map[string]int64{},
 	}
 
-	idx.loadCache(ctx)
+	go idx.ensureInitialized(ctx)
 
 	return idx, nil
+}
+
+func (idx *Index) ensureInitialized(ctx context.Context) error {
+	idx.initOnce.Do(func() {
+		db, err := chromem.NewPersistentDB(".sourcerer/db", false)
+		if err != nil {
+			idx.initErr = fmt.Errorf("failed to create vector db: %w", err)
+			return
+		}
+
+		collection, err := db.GetOrCreateCollection("code-chunks", nil, nil)
+		if err != nil {
+			idx.initErr = fmt.Errorf("failed to create vector db collection: %w", err)
+			return
+		}
+
+		idx.collection = collection
+		idx.loadCache(ctx)
+	})
+
+	return idx.initErr
 }
 
 func (idx *Index) loadCache(ctx context.Context) {
 	idx.cacheMu.Lock()
 	defer idx.cacheMu.Unlock()
 
-	fileChunks := map[string][]*ChunkMetadata{}
-	chunkIDs := idx.collection.ListIDs(ctx)
-	for _, chunkID := range chunkIDs {
-		parts := strings.SplitN(chunkID, "::", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		filePath := parts[0]
-
-		// Check if file still exists
-		_, err := os.Stat(filePath)
-		if err != nil {
-			where := map[string]string{"file": filePath}
-			idx.collection.Delete(ctx, where, nil)
-			continue
-		}
-
-		chunk, err := idx.GetChunk(ctx, chunkID)
-		if err != nil {
-			continue
-		}
-
-		fileChunks[filePath] = append(fileChunks[filePath], &ChunkMetadata{
-			Type:     chunk.Type,
-			Path:     chunk.Path,
-			ParsedAt: chunk.ParsedAt,
-		})
+	docs, err := idx.collection.ListDocumentsShallow(ctx)
+	if err != nil {
+		return
 	}
 
-	idx.cache = fileChunks
+	fileMaxParsed := make(map[string]int64)
+	for _, doc := range docs {
+		filePath := doc.Metadata["file"]
+		_, exists := fileMaxParsed[filePath]
+		if exists {
+			continue
+		}
+
+		parsedAt, err := strconv.ParseInt(doc.Metadata["parsedAt"], 10, 64)
+		if err != nil {
+			continue
+		}
+
+		fileMaxParsed[filePath] = parsedAt
+	}
+
+	idx.cache = fileMaxParsed
 }
 
-func (idx *Index) IsStale(filePath string) bool {
+func (idx *Index) IsStale(ctx context.Context, filePath string) bool {
 	fileInfo, err := os.Stat(filePath)
 	if err != nil {
 		return true
@@ -101,24 +98,21 @@ func (idx *Index) IsStale(filePath string) bool {
 	idx.cacheMu.RLock()
 	defer idx.cacheMu.RUnlock()
 
-	chunks, exists := idx.cache[filePath]
-	if !exists || len(chunks) == 0 {
+	maxParsedAt, exists := idx.cache[filePath]
+	if !exists {
 		return true
-	}
-
-	// Find the maximum parsedAt timestamp among all chunks
-	var maxParsedAt int64
-	for _, chunk := range chunks {
-		if chunk.ParsedAt > maxParsedAt {
-			maxParsedAt = chunk.ParsedAt
-		}
 	}
 
 	return fileInfo.ModTime().Unix() > maxParsedAt
 }
 
 func (idx *Index) Index(ctx context.Context, file *parser.File) error {
-	err := idx.Remove(ctx, file.Path)
+	err := idx.ensureInitialized(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = idx.Remove(ctx, file.Path)
 	if err != nil {
 		return err
 	}
@@ -156,22 +150,21 @@ func (idx *Index) Index(ctx context.Context, file *parser.File) error {
 	idx.cacheMu.Lock()
 	defer idx.cacheMu.Unlock()
 
-	chunkMetadata := make([]*ChunkMetadata, 0, len(file.Chunks))
-	for _, chunk := range file.Chunks {
-		chunkMetadata = append(chunkMetadata, &ChunkMetadata{
-			Type:     chunk.Type,
-			Path:     chunk.Path,
-			ParsedAt: chunk.ParsedAt,
-		})
+	if len(file.Chunks) > 0 {
+		idx.cache[file.Path] = file.Chunks[0].ParsedAt
 	}
-	idx.cache[file.Path] = chunkMetadata
 
 	return nil
 }
 
 func (idx *Index) Remove(ctx context.Context, filePath string) error {
+	err := idx.ensureInitialized(ctx)
+	if err != nil {
+		return err
+	}
+
 	where := map[string]string{"file": filePath}
-	err := idx.collection.Delete(ctx, where, nil)
+	err = idx.collection.Delete(ctx, where, nil)
 	if err != nil {
 		return fmt.Errorf("failed to remove documents from vector db: %w", err)
 	}
@@ -185,6 +178,11 @@ func (idx *Index) Remove(ctx context.Context, filePath string) error {
 }
 
 func (idx *Index) Search(ctx context.Context, query string, fileTypes []string) ([]string, error) {
+	err := idx.ensureInitialized(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(fileTypes) == 0 {
 		fileTypes = []string{"src", "docs"}
 	}
@@ -204,6 +202,11 @@ func (idx *Index) Search(ctx context.Context, query string, fileTypes []string) 
 }
 
 func (idx *Index) FindSimilarChunks(ctx context.Context, chunkID string) ([]string, error) {
+	err := idx.ensureInitialized(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	doc, err := idx.collection.GetByID(ctx, chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("chunk not found: %s", chunkID)
@@ -265,6 +268,11 @@ func (idx *Index) formatSearchResults(
 }
 
 func (idx *Index) GetChunk(ctx context.Context, id string) (*parser.Chunk, error) {
+	err := idx.ensureInitialized(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	doc, err := idx.collection.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("chunk not found: %s", id)
@@ -288,4 +296,23 @@ func (idx *Index) GetChunk(ctx context.Context, id string) (*parser.Chunk, error
 		EndColumn:   uint(endColumn),
 		ParsedAt:    parsedAt,
 	}, nil
+}
+
+func (idx *Index) CleanupDeletedFiles(ctx context.Context) {
+	err := idx.ensureInitialized(ctx)
+	if err != nil {
+		return
+	}
+
+	idx.cacheMu.RLock()
+	defer idx.cacheMu.RUnlock()
+
+	for filePath := range idx.cache {
+		go func(path string) {
+			_, err := os.Stat(filePath)
+			if os.IsNotExist(err) {
+				idx.Remove(ctx, filePath)
+			}
+		}(filePath)
+	}
 }

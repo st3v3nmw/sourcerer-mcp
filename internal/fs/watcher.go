@@ -26,6 +26,9 @@ type Watcher struct {
 	debounceDuration time.Duration
 	ctx              context.Context
 	cancel           context.CancelFunc
+
+	initOnce sync.Once
+	initErr  error
 }
 
 func NewWatcher(ctx context.Context, workspaceRoot string, supportedExts []string, handler FileChangeHandler) (*Watcher, error) {
@@ -46,17 +49,19 @@ func NewWatcher(ctx context.Context, workspaceRoot string, supportedExts []strin
 		cancel:           cancel,
 	}
 
-	err = w.addWatchers()
-	if err != nil {
-		fsWatcher.Close()
-		cancel()
-
-		return nil, err
-	}
+	go w.ensureInitialized()
 
 	go w.watch()
 
 	return w, nil
+}
+
+func (w *Watcher) ensureInitialized() error {
+	w.initOnce.Do(func() {
+		w.initErr = w.addWatchers()
+	})
+
+	return w.initErr
 }
 
 func (w *Watcher) addWatchers() error {
@@ -65,10 +70,24 @@ func (w *Watcher) addWatchers() error {
 		supportedExts = append(supportedExts, ext)
 	}
 
-	return WalkSourceFiles(w.workspaceRoot, supportedExts, func(filePath string) error {
+	uniqueDirs := make(map[string]bool)
+	err := WalkSourceFiles(w.workspaceRoot, supportedExts, func(filePath string) error {
 		dir := filepath.Dir(filepath.Join(w.workspaceRoot, filePath))
-		return w.fsWatcher.Add(dir)
+		uniqueDirs[dir] = true
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	for dir := range uniqueDirs {
+		err := w.fsWatcher.Add(dir)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (w *Watcher) watch() {

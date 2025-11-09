@@ -27,3 +27,6 @@ go.work.sum
 
 # Demos
 demo.cast
+
+# AI tooling
+.claude/
