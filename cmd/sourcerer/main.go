@@ -27,7 +27,8 @@ func main() {
 	}
 	defer server.Close()
 
-	if err := server.Serve(); err != nil {
+	err = server.Serve()
+	if err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
 }
