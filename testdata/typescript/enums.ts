@@ -61,3 +61,16 @@ namespace EnumNamespace {
         Option2 = 2
     }
 }
+
+// Exported enums
+export enum ExportedEnum {
+    Alpha = "alpha",
+    Beta = "beta",
+    Gamma = "gamma"
+}
+
+export enum Status {
+    Pending = "pending",
+    Active = "active",
+    Complete = "complete"
+}

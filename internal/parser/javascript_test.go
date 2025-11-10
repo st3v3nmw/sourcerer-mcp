@@ -132,6 +132,48 @@ function* generator_function() {
 			startLine: 43,
 			endLine:   47,
 		},
+		{
+			name:    "Exported Function",
+			path:    "exported_function",
+			summary: "export function exported_function(input) {",
+			source: `// Exported functions
+export function exported_function(input) {
+    return input.length > 0;
+}`,
+			startLine: 49,
+			endLine:   52,
+		},
+		{
+			name:    "Async Exported Function",
+			path:    "async_exported_function",
+			summary: "export async function async_exported_function(data) {",
+			source: `export async function async_exported_function(data) {
+    return await Promise.resolve(data);
+}`,
+			startLine: 54,
+			endLine:   56,
+		},
+		{
+			name:    "Default Exported Function",
+			path:    "default_exported_function",
+			summary: "export default function default_exported_function() {",
+			source: `export default function default_exported_function() {
+    return "default";
+}`,
+			startLine: 58,
+			endLine:   60,
+		},
+		{
+			name:    "Exported Generator",
+			path:    "exported_generator",
+			summary: "export function* exported_generator() {",
+			source: `export function* exported_generator() {
+    yield "a";
+    yield "b";
+}`,
+			startLine: 62,
+			endLine:   65,
+		},
 	}
 
 	for _, test := range tests {
@@ -245,6 +287,51 @@ class ClassWithPrivates {
 }`,
 			startLine: 52,
 			endLine:   59,
+		},
+		{
+			name:    "Exported Class",
+			path:    "ExportedClass",
+			summary: "export class ExportedClass {",
+			source: `// Exported classes
+export class ExportedClass {
+    constructor(value) {
+        this.value = value;
+    }
+
+    getValue() {
+        return this.value;
+    }
+}`,
+			startLine: 61,
+			endLine:   70,
+		},
+		{
+			name:    "Exported APIProvider",
+			path:    "APIProvider",
+			summary: "export class APIProvider {",
+			source: `export class APIProvider {
+    constructor(name) {
+        this.name = name;
+    }
+
+    process() {
+        return ` + "`Processing: ${this.name}`" + `;
+    }
+}`,
+			startLine: 72,
+			endLine:   80,
+		},
+		{
+			name:    "Default Exported Plugin",
+			path:    "DefaultPlugin",
+			summary: "export default class DefaultPlugin {",
+			source: `export default class DefaultPlugin {
+    constructor(config) {
+        this.config = config;
+    }
+}`,
+			startLine: 82,
+			endLine:   86,
 		},
 	}
 
@@ -527,6 +614,31 @@ let {name, age} = person;`,
 			source:    `var globalVar = window.something || "default";`,
 			startLine: 47,
 			endLine:   47,
+		},
+		{
+			name:    "Exported Const",
+			path:    "EXPORTED_CONST",
+			summary: "export const EXPORTED_CONST = \"constant value\";",
+			source: `// Exported variables
+export const EXPORTED_CONST = "constant value";`,
+			startLine: 49,
+			endLine:   50,
+		},
+		{
+			name:      "Exported API_KEY",
+			path:      "API_KEY",
+			summary:   "export const API_KEY = \"api-key-12345\";",
+			source:    `export const API_KEY = "api-key-12345";`,
+			startLine: 51,
+			endLine:   51,
+		},
+		{
+			name:      "Exported Let",
+			path:      "exported_let",
+			summary:   "export let exported_let = 42;",
+			source:    `export let exported_let = 42;`,
+			startLine: 52,
+			endLine:   52,
 		},
 	}
 

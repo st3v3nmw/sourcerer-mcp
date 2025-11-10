@@ -174,6 +174,37 @@ function myFunc(x: number): string;`,
 			startLine: 64,
 			endLine:   65,
 		},
+		{
+			name:    "Exported Function",
+			path:    "exportedFunction",
+			summary: "export function exportedFunction(input: string): boolean {",
+			source: `// Exported functions
+export function exportedFunction(input: string): boolean {
+    return input.length > 0;
+}`,
+			startLine: 67,
+			endLine:   70,
+		},
+		{
+			name:    "Async Exported Function",
+			path:    "asyncExportedFunction",
+			summary: "export async function asyncExportedFunction(data: any): Promise<void> {",
+			source: `export async function asyncExportedFunction(data: any): Promise<void> {
+    await Promise.resolve(data);
+}`,
+			startLine: 72,
+			endLine:   74,
+		},
+		{
+			name:    "Exported Default Function",
+			path:    "defaultExportedFunction",
+			summary: "export default function defaultExportedFunction(): string {",
+			source: `export default function defaultExportedFunction(): string {
+    return "default";
+}`,
+			startLine: 76,
+			endLine:   78,
+		},
 	}
 
 	for _, test := range tests {
@@ -359,6 +390,53 @@ class BugReport {
 			startLine: 96,
 			endLine:   106,
 		},
+		{
+			name:    "Exported Class",
+			path:    "ExportedClass",
+			summary: "export class ExportedClass {",
+			source: `// Exported classes
+export class ExportedClass {
+    private value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}`,
+			startLine: 108,
+			endLine:   119,
+		},
+		{
+			name:    "Exported OpenRouterProvider",
+			path:    "OpenRouterProvider",
+			summary: "export class OpenRouterProvider implements Processable {",
+			source: `export class OpenRouterProvider implements Processable {
+    name = "OpenRouter";
+
+    process(): void {
+        console.log("processing");
+    }
+}`,
+			startLine: 121,
+			endLine:   127,
+		},
+		{
+			name:    "Exported Default Class",
+			path:    "TutorPlugin",
+			summary: "export default class TutorPlugin {",
+			source: `export default class TutorPlugin {
+    private config: any;
+
+    constructor(config: any) {
+        this.config = config;
+    }
+}`,
+			startLine: 129,
+			endLine:   135,
+		},
 	}
 
 	for _, test := range tests {
@@ -522,6 +600,29 @@ interface MergedInterface {
 }`,
 			startLine: 65,
 			endLine:   67,
+		},
+		{
+			name:    "Exported Interface",
+			path:    "ExportedInterface",
+			summary: "export interface ExportedInterface {",
+			source: `// Exported interfaces
+export interface ExportedInterface {
+    id: string;
+    process(): void;
+}`,
+			startLine: 69,
+			endLine:   73,
+		},
+		{
+			name:    "Exported LLMProvider",
+			path:    "LLMProvider",
+			summary: "export interface LLMProvider {",
+			source: `export interface LLMProvider {
+    name: string;
+    generate(prompt: string): Promise<string>;
+}`,
+			startLine: 75,
+			endLine:   78,
 		},
 	}
 
@@ -723,6 +824,26 @@ type ConstrainedType<T extends Record<string, any>> = {
 			startLine: 61,
 			endLine:   65,
 		},
+		{
+			name:    "Exported Type",
+			path:    "ExportedType",
+			summary: "export type ExportedType = string | number;",
+			source: `// Exported types
+export type ExportedType = string | number;`,
+			startLine: 67,
+			endLine:   68,
+		},
+		{
+			name:    "Exported ConfigOptions",
+			path:    "ConfigOptions",
+			summary: "export type ConfigOptions = {",
+			source: `export type ConfigOptions = {
+    enabled: boolean;
+    timeout: number;
+};`,
+			startLine: 70,
+			endLine:   73,
+		},
 	}
 
 	for _, test := range tests {
@@ -864,6 +985,31 @@ namespace EnumNamespace {
 }`,
 			startLine: 57,
 			endLine:   63,
+		},
+		{
+			name:    "Exported Enum",
+			path:    "ExportedEnum",
+			summary: "export enum ExportedEnum {",
+			source: `// Exported enums
+export enum ExportedEnum {
+    Alpha = "alpha",
+    Beta = "beta",
+    Gamma = "gamma"
+}`,
+			startLine: 65,
+			endLine:   70,
+		},
+		{
+			name:    "Exported Status",
+			path:    "Status",
+			summary: "export enum Status {",
+			source: `export enum Status {
+    Pending = "pending",
+    Active = "active",
+    Complete = "complete"
+}`,
+			startLine: 72,
+			endLine:   76,
 		},
 	}
 
@@ -1439,6 +1585,31 @@ const readonly_array = [1, 2, 3] as const;`,
 			source:    `declare var jQuery: any;`,
 			startLine: 67,
 			endLine:   67,
+		},
+		{
+			name:    "Exported Const",
+			path:    "EXPORTED_CONST",
+			summary: `export const EXPORTED_CONST = "constant value";`,
+			source: `// Exported variables
+export const EXPORTED_CONST = "constant value";`,
+			startLine: 69,
+			endLine:   70,
+		},
+		{
+			name:    "Exported VIEW_TYPE_REVIEW",
+			path:    "VIEW_TYPE_REVIEW",
+			summary: `export const VIEW_TYPE_REVIEW = "tutor-review";`,
+			source: `export const VIEW_TYPE_REVIEW = "tutor-review";`,
+			startLine: 72,
+			endLine:   72,
+		},
+		{
+			name:      "Exported Let",
+			path:      "exportedLet",
+			summary:   `export let exportedLet: number = 42;`,
+			source:    `export let exportedLet: number = 42;`,
+			startLine: 74,
+			endLine:   74,
 		},
 	}
 

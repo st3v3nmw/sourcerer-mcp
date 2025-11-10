@@ -65,3 +65,10 @@ const readonly_array = [1, 2, 3] as const;
 let readonly_object: Readonly<{ x: number }> = { x: 10 };
 
 declare var jQuery: any;
+
+// Exported variables
+export const EXPORTED_CONST = "constant value";
+
+export const VIEW_TYPE_REVIEW = "tutor-review";
+
+export let exportedLet: number = 42;

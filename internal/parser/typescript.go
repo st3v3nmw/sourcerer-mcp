@@ -37,14 +37,24 @@ var TypeScriptSpec = &LanguageSpec{
 		"ambient_declaration": {
 			NameQuery: `(ambient_declaration (variable_declaration (variable_declarator name: (identifier) @name)))`,
 		},
-		"export_statement": {
-			NameQuery: `(export_statement (declaration name: (identifier) @name))`,
-		},
 		"enum_declaration": {
 			NameQuery: `(enum_declaration name: (identifier) @name)`,
 		},
 		"module": {
 			NameQuery: `(module name: (identifier) @name)`,
+		},
+		"export_statement": {
+			NameQuery: `(export_statement [
+				(function_declaration name: (identifier) @name)
+				(generator_function_declaration name: (identifier) @name)
+				(class_declaration name: (type_identifier) @name)
+				(abstract_class_declaration name: (type_identifier) @name)
+				(interface_declaration name: (type_identifier) @name)
+				(type_alias_declaration name: (type_identifier) @name)
+				(lexical_declaration (variable_declarator name: (identifier) @name))
+				(variable_declaration (variable_declarator name: (identifier) @name))
+				(enum_declaration name: (identifier) @name)
+			])`,
 		},
 	},
 	FoldIntoNextNode: []string{"comment"},

@@ -63,3 +63,16 @@ function rest_params(first: string, ...rest: number[]): string {
 
 // Function signature
 function myFunc(x: number): string;
+
+// Exported functions
+export function exportedFunction(input: string): boolean {
+    return input.length > 0;
+}
+
+export async function asyncExportedFunction(data: any): Promise<void> {
+    await Promise.resolve(data);
+}
+
+export default function defaultExportedFunction(): string {
+    return "default";
+}
