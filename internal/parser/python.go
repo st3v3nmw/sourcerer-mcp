@@ -23,11 +23,28 @@ var PythonSpec = &LanguageSpec{
 				(class_definition) @summary
 			])`,
 		},
+		"expression_statement": {
+			NameQuery: `(expression_statement (assignment left: (identifier) @name))`,
+		},
+	},
+	ExtractChildrenIn: []string{
+		"class_definition",
+		"block",
 	},
 	FoldIntoNextNode: []string{"comment"},
 	SkipTypes: []string{
-		// These pollute search results
+		// Imports pollute search results
 		"import_statement",
+		"import_from_statement",
+		// Skip punctuation and keyword tokens
+		":", "class", "def",
+		"pass", "pass_statement",
+		// Skip identifier tokens (they're part of declarations)
+		"identifier",
+		// Skip argument lists and other syntax elements
+		"argument_list",
+		// Skip container nodes (but still extract their children)
+		"block",
 	},
 	FileTypeRules: []FileTypeRule{
 		{Pattern: "**/test*.py", Type: FileTypeTests},

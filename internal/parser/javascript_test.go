@@ -135,7 +135,7 @@ function* generator_function() {
 		{
 			name:    "Exported Function",
 			path:    "exported_function",
-			summary: "export function exported_function(input) {",
+			summary: "function exported_function(input) {",
 			source: `// Exported functions
 export function exported_function(input) {
     return input.length > 0;
@@ -146,7 +146,7 @@ export function exported_function(input) {
 		{
 			name:    "Async Exported Function",
 			path:    "async_exported_function",
-			summary: "export async function async_exported_function(data) {",
+			summary: "async function async_exported_function(data) {",
 			source: `export async function async_exported_function(data) {
     return await Promise.resolve(data);
 }`,
@@ -156,7 +156,7 @@ export function exported_function(input) {
 		{
 			name:    "Default Exported Function",
 			path:    "default_exported_function",
-			summary: "export default function default_exported_function() {",
+			summary: "function default_exported_function() {",
 			source: `export default function default_exported_function() {
     return "default";
 }`,
@@ -166,7 +166,7 @@ export function exported_function(input) {
 		{
 			name:    "Exported Generator",
 			path:    "exported_generator",
-			summary: "export function* exported_generator() {",
+			summary: "function* exported_generator() {",
 			source: `export function* exported_generator() {
     yield "a";
     yield "b";
@@ -291,7 +291,7 @@ class ClassWithPrivates {
 		{
 			name:    "Exported Class",
 			path:    "ExportedClass",
-			summary: "export class ExportedClass {",
+			summary: "class ExportedClass {",
 			source: `// Exported classes
 export class ExportedClass {
     constructor(value) {
@@ -308,7 +308,7 @@ export class ExportedClass {
 		{
 			name:    "Exported APIProvider",
 			path:    "APIProvider",
-			summary: "export class APIProvider {",
+			summary: "class APIProvider {",
 			source: `export class APIProvider {
     constructor(name) {
         this.name = name;
@@ -324,7 +324,7 @@ export class ExportedClass {
 		{
 			name:    "Default Exported Plugin",
 			path:    "DefaultPlugin",
-			summary: "export default class DefaultPlugin {",
+			summary: "class DefaultPlugin {",
 			source: `export default class DefaultPlugin {
     constructor(config) {
         this.config = config;
@@ -332,6 +332,159 @@ export class ExportedClass {
 }`,
 			startLine: 82,
 			endLine:   86,
+		},
+		// ClassWithMethods members
+		{
+			name:    "ClassWithMethods::constructor",
+			path:    "ClassWithMethods::constructor",
+			summary: "constructor(value) {",
+			source: `constructor(value) {
+        this.value = value;
+    }`,
+			startLine: 9,
+			endLine:   11,
+		},
+		{
+			name:    "ClassWithMethods::getValue",
+			path:    "ClassWithMethods::getValue",
+			summary: "getValue() {",
+			source: `// Instance method
+    getValue() {
+        return this.value;
+    }`,
+			startLine: 13,
+			endLine:   16,
+		},
+		{
+			name:    "ClassWithMethods::setValue",
+			path:    "ClassWithMethods::setValue",
+			summary: "setValue(newValue) {",
+			source: `// Setter method
+    setValue(newValue) {
+        this.value = newValue;
+    }`,
+			startLine: 18,
+			endLine:   21,
+		},
+		{
+			name:    "ClassWithMethods::createDefault",
+			path:    "ClassWithMethods::createDefault",
+			summary: "static createDefault() {",
+			source: `// Static method
+    static createDefault() {
+        return new ClassWithMethods(0);
+    }`,
+			startLine: 23,
+			endLine:   26,
+		},
+		{
+			name:    "ClassWithMethods::displayValue",
+			path:    "ClassWithMethods::displayValue",
+			summary: "get displayValue() {",
+			source: `// Getter method
+    get displayValue() {
+        return ` + "`Value: ${this.value}`" + `;
+    }`,
+			startLine: 28,
+			endLine:   31,
+		},
+		// ExtendedClass members
+		{
+			name:    "ExtendedClass::constructor",
+			path:    "ExtendedClass::constructor",
+			summary: "constructor(value, name) {",
+			source: `constructor(value, name) {
+        super(value);
+        this.name = name;
+    }`,
+			startLine: 36,
+			endLine:   39,
+		},
+		{
+			name:    "ExtendedClass::getValue",
+			path:    "ExtendedClass::getValue",
+			summary: "getValue() {",
+			source: `// Override parent method
+    getValue() {
+        return ` + "`${this.name}: ${this.value}`" + `;
+    }`,
+			startLine: 41,
+			endLine:   44,
+		},
+		{
+			name:    "ExtendedClass::getName",
+			path:    "ExtendedClass::getName",
+			summary: "getName() {",
+			source: `// New method
+    getName() {
+        return this.name;
+    }`,
+			startLine: 46,
+			endLine:   49,
+		},
+		// ClassWithPrivates members
+		{
+			name:    "ClassWithPrivates::getPrivate",
+			path:    "ClassWithPrivates::getPrivate",
+			summary: "getPrivate() {",
+			source: `getPrivate() {
+        return this.#privateField;
+    }`,
+			startLine: 56,
+			endLine:   58,
+		},
+		// ExportedClass members
+		{
+			name:    "ExportedClass::constructor",
+			path:    "ExportedClass::constructor",
+			summary: "constructor(value) {",
+			source: `constructor(value) {
+        this.value = value;
+    }`,
+			startLine: 63,
+			endLine:   65,
+		},
+		{
+			name:    "ExportedClass::getValue",
+			path:    "ExportedClass::getValue",
+			summary: "getValue() {",
+			source: `getValue() {
+        return this.value;
+    }`,
+			startLine: 67,
+			endLine:   69,
+		},
+		// APIProvider members
+		{
+			name:    "APIProvider::constructor",
+			path:    "APIProvider::constructor",
+			summary: "constructor(name) {",
+			source: `constructor(name) {
+        this.name = name;
+    }`,
+			startLine: 73,
+			endLine:   75,
+		},
+		{
+			name:    "APIProvider::process",
+			path:    "APIProvider::process",
+			summary: "process() {",
+			source: `process() {
+        return ` + "`Processing: ${this.name}`" + `;
+    }`,
+			startLine: 77,
+			endLine:   79,
+		},
+		// DefaultPlugin members
+		{
+			name:    "DefaultPlugin::constructor",
+			path:    "DefaultPlugin::constructor",
+			summary: "constructor(config) {",
+			source: `constructor(config) {
+        this.config = config;
+    }`,
+			startLine: 83,
+			endLine:   85,
 		},
 	}
 
@@ -618,7 +771,7 @@ let {name, age} = person;`,
 		{
 			name:    "Exported Const",
 			path:    "EXPORTED_CONST",
-			summary: "export const EXPORTED_CONST = \"constant value\";",
+			summary: "const EXPORTED_CONST = \"constant value\";",
 			source: `// Exported variables
 export const EXPORTED_CONST = "constant value";`,
 			startLine: 49,
@@ -627,7 +780,7 @@ export const EXPORTED_CONST = "constant value";`,
 		{
 			name:      "Exported API_KEY",
 			path:      "API_KEY",
-			summary:   "export const API_KEY = \"api-key-12345\";",
+			summary:   "const API_KEY = \"api-key-12345\";",
 			source:    `export const API_KEY = "api-key-12345";`,
 			startLine: 51,
 			endLine:   51,
@@ -635,7 +788,7 @@ export const EXPORTED_CONST = "constant value";`,
 		{
 			name:      "Exported Let",
 			path:      "exported_let",
-			summary:   "export let exported_let = 42;",
+			summary:   "let exported_let = 42;",
 			source:    `export let exported_let = 42;`,
 			startLine: 52,
 			endLine:   52,

@@ -233,7 +233,7 @@ func (p *Parser) Chunk(filePath string) (*File, error) {
 		return nil, err
 	}
 
-	file.Chunks = p.extractChunks(file.tree.RootNode(), file.Source, "", fileType)
+	file.Chunks = p.extractChunks(file.tree.RootNode(), file.Source, "", fileType, nil)
 	for i := range len(file.Chunks) {
 		file.Chunks[i].File = file.Path
 	}
@@ -267,51 +267,50 @@ func (p *Parser) extractChunks(
 	source []byte,
 	parentPath string,
 	fileType FileType,
+	folded []*tree_sitter.Node,
 ) []*Chunk {
 	var chunks []*Chunk
 	usedPaths := map[string]bool{}
-	var folded []*tree_sitter.Node
 
 	for i := uint(0); i < node.ChildCount(); i++ {
 		child := node.Child(i)
 		kind := child.Kind()
-
-		if slices.Contains(p.spec.SkipTypes, kind) {
-			// Process any remaining folded nodes as standalone chunks
-			for _, foldedNode := range folded {
-				chunks = append(chunks, p.extractNode(foldedNode, source, usedPaths, fileType, nil))
-			}
-			folded = nil
-
-			continue
-		}
 
 		if slices.Contains(p.spec.FoldIntoNextNode, kind) {
 			folded = append(folded, child)
 			continue
 		}
 
-		// Process code nodes & folded nodes, if any
 		chunk, path := p.createChunkFromNode(child, source, parentPath, fileType, usedPaths, folded)
-		chunks = append(chunks, chunk)
-		folded = nil
+		if chunk != nil {
+			chunks = append(chunks, chunk)
+			folded = nil
+		}
 
 		// Recursively process children if specified
 		if slices.Contains(p.spec.ExtractChildrenIn, kind) {
-			childChunks := p.extractChunks(child, source, path, fileType)
+			childChunks := p.extractChunks(child, source, path, fileType, folded)
 			chunks = append(chunks, childChunks...)
+			folded = nil
 		}
+
+		for _, foldedNode := range folded {
+			chunks = append(chunks, p.extractHashedNode(foldedNode, source, usedPaths, fileType, nil))
+		}
+		folded = nil
 	}
 
-	// Process any remaining folded nodes as standalone chunks
+	// Any leftover folded nodes become standalone chunks
 	for _, foldedNode := range folded {
-		chunks = append(chunks, p.extractNode(foldedNode, source, usedPaths, fileType, nil))
+		chunks = append(chunks, p.extractHashedNode(foldedNode, source, usedPaths, fileType, nil))
 	}
+	folded = nil
 
 	return chunks
 }
 
 // createChunkFromNode creates a chunk from a code node, attempting named extraction first
+// Returns nil chunk if the node type should be skipped, but still returns the path for recursion
 func (p *Parser) createChunkFromNode(
 	node *tree_sitter.Node,
 	source []byte,
@@ -321,8 +320,12 @@ func (p *Parser) createChunkFromNode(
 	folded []*tree_sitter.Node,
 ) (*Chunk, string) {
 	kind := node.Kind()
-	extractor, exists := p.spec.NamedChunks[kind]
 
+	if slices.Contains(p.spec.SkipTypes, kind) {
+		return nil, parentPath
+	}
+
+	extractor, exists := p.spec.NamedChunks[kind]
 	if exists {
 		chunkPath, err := p.buildChunkPath(extractor, node, source, parentPath)
 		if err == nil {
@@ -332,11 +335,11 @@ func (p *Parser) createChunkFromNode(
 	}
 
 	// No named extractor or building chunk path failed, use content-hash
-	return p.extractNode(node, source, usedPaths, fileType, folded), parentPath
+	return p.extractHashedNode(node, source, usedPaths, fileType, folded), parentPath
 }
 
-// extractNode creates a chunk from a node using content-based hashing for the path
-func (p *Parser) extractNode(
+// extractHashedNode creates a chunk from a node using content-based hashing for the path
+func (p *Parser) extractHashedNode(
 	node *tree_sitter.Node,
 	source []byte,
 	usedPaths map[string]bool,
