@@ -65,3 +65,14 @@ interface MergedInterface {
 interface MergedInterface {
     second: number;
 }
+
+// Exported interfaces
+export interface ExportedInterface {
+    id: string;
+    process(): void;
+}
+
+export interface LLMProvider {
+    name: string;
+    generate(prompt: string): Promise<string>;
+}

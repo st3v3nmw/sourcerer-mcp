@@ -57,3 +57,30 @@ class ClassWithPrivates {
         return this.#privateField;
     }
 }
+
+// Exported classes
+export class ExportedClass {
+    constructor(value) {
+        this.value = value;
+    }
+
+    getValue() {
+        return this.value;
+    }
+}
+
+export class APIProvider {
+    constructor(name) {
+        this.name = name;
+    }
+
+    process() {
+        return `Processing: ${this.name}`;
+    }
+}
+
+export default class DefaultPlugin {
+    constructor(config) {
+        this.config = config;
+    }
+}

@@ -45,3 +45,8 @@ const async_arrow_func = async (data) => {
 let {name, age} = person;
 const [first, ...rest] = numbers;
 var globalVar = window.something || "default";
+
+// Exported variables
+export const EXPORTED_CONST = "constant value";
+export const API_KEY = "api-key-12345";
+export let exported_let = 42;

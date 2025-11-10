@@ -23,7 +23,13 @@ var JavaScriptSpec = &LanguageSpec{
 			NameQuery: `(variable_declaration (variable_declarator name: (identifier) @name))`,
 		},
 		"export_statement": {
-			NameQuery: `(export_statement (declaration name: (identifier) @name))`,
+			NameQuery: `(export_statement [
+				(function_declaration name: (identifier) @name)
+				(generator_function_declaration name: (identifier) @name)
+				(class_declaration name: (identifier) @name)
+				(lexical_declaration (variable_declarator name: (identifier) @name))
+				(variable_declaration (variable_declarator name: (identifier) @name))
+			])`,
 		},
 	},
 	FoldIntoNextNode: []string{"comment"},

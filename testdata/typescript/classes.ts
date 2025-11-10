@@ -104,3 +104,32 @@ class BugReport {
     this.title = t;
   }
 }
+
+// Exported classes
+export class ExportedClass {
+    private value: number;
+
+    constructor(value: number) {
+        this.value = value;
+    }
+
+    getValue(): number {
+        return this.value;
+    }
+}
+
+export class OpenRouterProvider implements Processable {
+    name = "OpenRouter";
+
+    process(): void {
+        console.log("processing");
+    }
+}
+
+export default class TutorPlugin {
+    private config: any;
+
+    constructor(config: any) {
+        this.config = config;
+    }
+}

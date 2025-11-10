@@ -45,3 +45,21 @@ function* generator_function() {
     yield 1;
     yield 2;
 }
+
+// Exported functions
+export function exported_function(input) {
+    return input.length > 0;
+}
+
+export async function async_exported_function(data) {
+    return await Promise.resolve(data);
+}
+
+export default function default_exported_function() {
+    return "default";
+}
+
+export function* exported_generator() {
+    yield "a";
+    yield "b";
+}

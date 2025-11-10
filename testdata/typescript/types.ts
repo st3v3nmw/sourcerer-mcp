@@ -63,3 +63,11 @@ type ConstrainedType<T extends Record<string, any>> = {
     data: T;
     keys: keyof T;
 };
+
+// Exported types
+export type ExportedType = string | number;
+
+export type ConfigOptions = {
+    enabled: boolean;
+    timeout: number;
+};
