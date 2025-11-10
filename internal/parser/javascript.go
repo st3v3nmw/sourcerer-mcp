@@ -22,20 +22,32 @@ var JavaScriptSpec = &LanguageSpec{
 		"variable_declaration": {
 			NameQuery: `(variable_declaration (variable_declarator name: (identifier) @name))`,
 		},
-		"export_statement": {
-			NameQuery: `(export_statement [
-				(function_declaration name: (identifier) @name)
-				(generator_function_declaration name: (identifier) @name)
-				(class_declaration name: (identifier) @name)
-				(lexical_declaration (variable_declarator name: (identifier) @name))
-				(variable_declaration (variable_declarator name: (identifier) @name))
-			])`,
+		"method_definition": {
+			NameQuery: `(method_definition name: (property_identifier) @name)`,
+		},
+		"field_definition": {
+			NameQuery: `(field_definition property: (property_identifier) @name)`,
 		},
 	},
-	FoldIntoNextNode: []string{"comment"},
+	ExtractChildrenIn: []string{
+		"class_declaration",
+		"class_body",
+		"export_statement",
+	},
+	FoldIntoNextNode: []string{"comment", "export", "default"},
 	SkipTypes: []string{
-		// These pollute search results
+		// Imports pollute search results
 		"import_statement",
+		// Skip punctuation and keyword tokens
+		"{", "}", ";",
+		"class", "extends", "implements",
+		// Skip identifier tokens (they're part of declarations)
+		"identifier",
+		// Skip class heritage clauses
+		"class_heritage",
+		// Skip container nodes (but still extract their children)
+		"class_body",
+		"export_statement",
 	},
 	FileTypeRules: []FileTypeRule{
 		{Pattern: "**/*.test.js", Type: FileTypeTests},

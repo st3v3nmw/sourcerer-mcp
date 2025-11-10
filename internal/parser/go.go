@@ -41,9 +41,10 @@ var GoSpec = &LanguageSpec{
 	},
 	FoldIntoNextNode: []string{"comment"},
 	SkipTypes: []string{
-		// These pollute search results
-		"package_clause",
+		// Imports pollute search results
 		"import_declaration",
+		// This clause also pollutes search results
+		"package_clause",
 	},
 	FileTypeRules: []FileTypeRule{
 		{Pattern: "**/*_test.go", Type: FileTypeTests},

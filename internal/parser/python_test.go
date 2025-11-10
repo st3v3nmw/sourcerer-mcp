@@ -145,14 +145,6 @@ func (s *PythonParserTestSuite) TestClassParsing() {
 		endLine   int
 	}{
 		{
-			name:      "From Import Statement",
-			path:      "6ac00db1eb5e953c",
-			summary:   "from dataclasses import dataclass",
-			source:    `from dataclasses import dataclass`,
-			startLine: 1,
-			endLine:   1,
-		},
-		{
 			name:    "Simple Class",
 			path:    "SimpleClass",
 			summary: "class SimpleClass:",
@@ -207,6 +199,57 @@ class DecoratedClass:
     age: int`,
 			startLine: 29,
 			endLine:   33,
+		},
+		// ClassWithMethods members
+		{
+			name:      "ClassWithMethods::value",
+			path:      "ClassWithMethods::value",
+			summary:   "value = -1",
+			source:    `value = -1`,
+			startLine: 8,
+			endLine:   8,
+		},
+		{
+			name:    "ClassWithMethods::__init__",
+			path:    "ClassWithMethods::__init__",
+			summary: "def __init__(self):",
+			source: `# Constructor method
+    def __init__(self):
+        self.value = 0`,
+			startLine: 10,
+			endLine:   12,
+		},
+		{
+			name:    "ClassWithMethods::method",
+			path:    "ClassWithMethods::method",
+			summary: "def method(self):",
+			source: `# Instance method
+    def method(self):
+        return self.value`,
+			startLine: 14,
+			endLine:   16,
+		},
+		{
+			name:    "ClassWithMethods::property_method",
+			path:    "ClassWithMethods::property_method",
+			summary: "def property_method(self):",
+			source: `# Property method with decorator
+    @property
+    def property_method(self):
+        return self.value * 2`,
+			startLine: 18,
+			endLine:   21,
+		},
+		// InheritedClass members
+		{
+			name:    "InheritedClass::method",
+			path:    "InheritedClass::method",
+			summary: "def method(self):",
+			source: `# Override parent method
+    def method(self):
+        return super().method() + 1`,
+			startLine: 25,
+			endLine:   27,
 		},
 	}
 
