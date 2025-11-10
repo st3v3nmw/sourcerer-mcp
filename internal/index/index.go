@@ -188,7 +188,8 @@ func (idx *Index) Search(ctx context.Context, query string, fileTypes []string) 
 	}
 
 	// chromem-go doesn't support OR filtering, for now fetch more & filter manually
-	results, err := idx.collection.Query(ctx, query, len(fileTypes)*maxResults, nil, nil)
+	nResults := min(len(fileTypes)*maxResults, idx.collection.Count())
+	results, err := idx.collection.Query(ctx, query, nResults, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to perform similarity search: %w", err)
 	}
